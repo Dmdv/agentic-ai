@@ -121,13 +121,20 @@ If you do not need to use a tool, output your final answer and explanation.
             command="npx",
             args=["-y", "@modelcontextprotocol/server-memory"],
         )
+        
+        # 6. Custom Bash Server (Python) - For CI/CD and Testing
+        bash_params = StdioServerParameters(
+            command="python3",
+            args=["mcp_server_bash.py"],
+        )
 
         servers = {
             "Filesystem": fs_params,
             "Git": git_params,
             "SQLite": sqlite_params,
             "Fetch": fetch_params,
-            "Memory": memory_params
+            "Memory": memory_params,
+            "Bash": bash_params
         }
 
         self.server_configs = servers
