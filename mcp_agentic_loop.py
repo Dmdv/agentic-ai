@@ -11,7 +11,7 @@ from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
 class MCPAgenticLoop:
-    def __init__(self, model_name: str = "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit"):
+    def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-4bit"):
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the MLX Agentic Loop with an MCP Server.")
     parser.add_argument("--prompt", type=str, default="List the files in the current directory and read the contents of 'agentic_loop.py' to summarize it.",
                         help="The initial user prompt.")
-    parser.add_argument("--model", type=str, default="mlx-community/Qwen2.5-Coder-32B-Instruct-4bit",
+    parser.add_argument("--model", type=str, default="mlx-community/Qwen3-Coder-Next-80B-4bit",
                         help="HuggingFace model ID (must be an MLX format model).")
     
     args = parser.parse_args()
