@@ -87,9 +87,10 @@ If you do not need to use a tool, output your final answer and explanation.
         return "\n".join(descriptions)
 
     async def setup_mcp_servers(self):
-        """Initializes multiple MCP servers (Filesystem and Git)."""
+        """Initializes multiple MCP servers (Filesystem, Git, SQLite, Puppeteer)."""
         import os
         allowed_dir = os.path.abspath(".")
+        db_path = os.path.join(allowed_dir, "agent.db")
         
         # 1. Filesystem Server (Node/npx)
         fs_params = StdioServerParameters(
@@ -102,10 +103,24 @@ If you do not need to use a tool, output your final answer and explanation.
             command="python3",
             args=["-m", "mcp_server_git", "--repository", allowed_dir],
         )
+        
+        # 3. SQLite Server (Python/pip) - for Database Operations
+        sqlite_params = StdioServerParameters(
+            command="python3",
+            args=["-m", "mcp_server_sqlite", "--db-path", db_path],
+        )
+        
+        # 4. Puppeteer Server (Node/npx) - for Web Scraping and RAG
+        puppeteer_params = StdioServerParameters(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-puppeteer"],
+        )
 
         servers = {
             "Filesystem": fs_params,
-            "Git": git_params
+            "Git": git_params,
+            "SQLite": sqlite_params,
+            "Puppeteer": puppeteer_params
         }
 
         # NOTE: For a production agent, context managers (async with) must be kept open 
