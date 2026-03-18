@@ -158,13 +158,25 @@ Fix the failing auth bug.
         # Phase 1: Planning
         steps = self._run_architect(user_prompt)
         print(f"\nArchitect Plan:")
+        
+        # Initialize the Execution Report
+        import datetime
+        report_lines = [
+            f"# Swarm Execution Report",
+            f"**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Task Prompt:** {user_prompt}",
+            f"\n## Architect's Execution Plan",
+        ]
+        
         for i, step in enumerate(steps):
             task = step.get("task", "")
             agent = step.get("agent", "Default Engineer")
             print(f"  {i+1}. [{agent}] -> {task}")
+            report_lines.append(f"{i+1}. **Agent:** `{agent}` -> **Task:** {task}")
             
         # Phase 2: Execution
         print(f"\n[SWARM PHASE 2] Handing off to Engineering Swarm...")
+        report_lines.append("\n## Engineering Phase")
         
         engineer = self._get_engineer_agent()
         
@@ -173,18 +185,32 @@ Fix the failing auth bug.
             task = step.get("task", "")
             agent_file = step.get("agent")
             
+            report_lines.append(f"\n### Step {i+1}: {task}")
+            
             # Hot-swap the persona if specified
             if agent_file and os.path.exists(os.path.join("agents", agent_file)):
                 print(f"\n=== SWARM HOT-SWAP: Loading '{agent_file}' Persona ===")
+                report_lines.append(f"- **Persona Loaded:** `{agent_file}`")
                 engineer.set_persona(os.path.join("agents", agent_file))
             else:
                 print(f"\n=== SWARM HOT-SWAP: Reverting to Default Engineer Persona ===")
+                report_lines.append("- **Persona Loaded:** `Default Engineer`")
                 engineer.set_persona(None)
                 
             print(f"\n=== EXECUTING STEP {i+1}/{len(steps)}: {task} ===")
+            
+            # Record the start of the task
+            report_lines.append(f"- **Status:** Executed")
             await engineer.run(user_prompt=task)
             
         print("\n=== SWARM EXECUTION COMPLETE ===")
+        report_lines.append("\n## Swarm Execution Complete")
+        
+        # Write the final report
+        report_content = "\n".join(report_lines)
+        with open("SWARM_EXECUTION_REPORT.md", "w") as f:
+            f.write(report_content)
+        print("-> Saved execution flow details to 'SWARM_EXECUTION_REPORT.md'")
         
         # Optional: You could add a manual cleanup here, but for a CLI tool, 
         # the OS will reclaim the memory when the python script exits.
