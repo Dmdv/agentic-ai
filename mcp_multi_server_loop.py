@@ -217,8 +217,8 @@ If you do not need to use a tool, output your final answer and explanation.
             except Exception as e:
                 print(f"Failed to connect to {name} server: {e}")
 
-        system_prompt = self.system_prompt_template.format(
-            tool_descriptions=self._format_tools()
+        system_prompt = self.system_prompt_template.replace(
+            "{tool_descriptions}", self._format_tools()
         )
         
         messages = [
