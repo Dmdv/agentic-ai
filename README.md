@@ -15,33 +15,43 @@ Traditional local backends (LM Studio, Ollama) are CPU-first frameworks retrofit
 
 This infrastructure uses `mlx-lm`. MLX treats macOS Unified Memory as direct arrays. This allows the orchestrator script to instantly load, inference, and dump massive models (via Python garbage collection) with **zero-overhead memory swapping**.
 
-### 2. The Dual-Model MoE Cognitive Loop
-We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using the latest open-weight MoE models (as of Q1 2026). MoEs are strictly superior for Apple Silicon because they provide the reasoning of massive models while keeping active parameters low, maximizing the Mac's ~800GB/s memory bandwidth.
+### 2. Multi-Agent Swarm Orchestration (Architect & Engineer)
+We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using a swarm of open-weight MoE models (as of Q1 2026). MoEs are strictly superior for Apple Silicon because they provide the reasoning of massive models while keeping active parameters low, maximizing the Mac's ~800GB/s memory bandwidth.
 
-*   **The Architect (System 2): Kimi K2.5 (1 Trillion Parameter MoE)**
-    *   *Active Parameters:* 32B
-    *   *Role:* Ingests the entire repository (up to 256k tokens), processes complex multi-step prompts, and outputs an architectural blueprint.
-*   **The Engineer (System 1): Qwen3-Coder-Next (80B MoE)**
-    *   *Active Parameters:* 3B
-    *   *Role:* Takes the Architect's plan and rapidly executes `SEARCH/REPLACE` diffs. At only 3B active parameters, it generates code at blistering speeds (150+ tokens/second).
+Our `mcp_swarm_loop.py` script orchestrates two distinct personas:
+*   **Phase 1: The Architect (e.g., Kimi K2.5 - 1T MoE)**
+    *   *Role:* Ingests the entire repository map and user prompt. It is strictly forbidden from writing code. Instead, it outputs a pristine JSON array of sequential steps (The Plan). It is then instantly unloaded from RAM.
+*   **Phase 2: The Engineer (e.g., Qwen3-Coder-Next - 80B MoE)**
+    *   *Role:* Loads into RAM, boots the MCP servers, and iteratively executes every step in the Architect's plan. At only 3B active parameters, it generates code and searches files at blistering speeds (150+ tokens/second).
 
-### 3. Model Context Protocol (MCP)
-Instead of hardcoding custom Python tools for file reading or bash execution, the loop utilizes the **Model Context Protocol**. 
-The Python orchestrator spins up multiple background MCP Servers (`@modelcontextprotocol/server-filesystem`, `mcp-server-git`, `mcp-server-sqlite`, and `@modelcontextprotocol/server-puppeteer`), aggregates their JSON schemas, and dynamically injects them into the Qwen Engineer model to grant it physical access to the local machine.
+### 3. Tree-Sitter Polyglot Repo Mapping
+Dumping raw code into a context window wastes compute and invites hallucinations. We use **Tree-Sitter** to build semantic "Skeleton Maps" of the repository.
+*   **Multi-Language:** Natively parses Python, JavaScript, TypeScript, Rust, Go, C++, etc.
+*   **DevOps Support:** Natively parses Dockerfiles, Makefiles, YAML, TOML, and Terraform (.tf).
+*   **Result:** The Architect model sees the exact signatures, classes, and infrastructure topologies of the entire workspace in under 5,000 tokens via the `.repo_map` file.
+
+### 4. Model Context Protocol (MCP) + Secure Bash
+Instead of hardcoding custom Python tools, the Engineer model interacts with your machine through **6 distinct MCP Servers**:
+1.  **Filesystem:** Safely reads and edits files.
+2.  **Git:** Handles staging, committing, and branching.
+3.  **SQLite:** Executes direct SQL migrations and queries.
+4.  **Fetch:** Downloads and parses web pages to raw markdown (Direct RAG).
+5.  **Memory:** A Knowledge Graph server for the Swarm to share context across sessions.
+6.  **Secure Bash (`mcp_server_bash.py`):** A custom-built, highly constrained Python server that allows the agent to run linters and tests (`pytest`, `npm run test`, `cargo build`) to close the Autonomous CI/CD Loop, without the security risk of giving an AI raw terminal access.
 
 ---
 
 ## 📂 Repository Contents
 
 ### Specifications
-*   `AGENTIC_INFRASTRUCTURE_SPECS_V5_MLX.md`: The final, definitive architectural blueprint detailing the MLX + MoE + MCP strategy. *(Read this first).*
-*   *(V1 - V4 specs are preserved for historical context on the pivot from REST APIs to MLX).*
+*   `AGENTIC_INFRASTRUCTURE_SPECS_V5_MLX.md`: The final architectural blueprint.
+*   *(V1 - V4 specs are preserved for historical context).*
 
-### Proof-of-Concept Scripts
-*   `test_mlx.py`: A basic script to verify Apple MLX is installed and can rapidly load, generate, and dump an Instruct model from memory.
-*   `agentic_loop.py`: A foundational mock loop demonstrating how Qwen outputs JSON tool-calls when prompted.
-*   `mcp_agentic_loop.py`: A functional loop wired to a single MCP Server (Filesystem) to allow the agent to read and write real files.
-*   `mcp_multi_server_loop.py`: The advanced orchestrator. It boots **four distinct MCP servers** (Filesystem, Git, SQLite, and Puppeteer), aggregates all available tools into a massive schema, and intelligently routes the agent's tool calls to the correct background process.
+### The Agents & Tools
+*   `generate_repo_map.py`: The Tree-Sitter script that generates the `.repo_map` context file.
+*   `mcp_server_bash.py`: The custom, secure Bash execution MCP server.
+*   `mcp_multi_server_loop.py`: The base single-model orchestrator (boots all 6 MCP servers).
+*   `mcp_swarm_loop.py`: The advanced Multi-Agent Swarm orchestrator (Architect -> Engineer pipeline).
 
 ---
 
@@ -59,67 +69,51 @@ The Python orchestrator spins up multiple background MCP Servers (`@modelcontext
    git clone https://github.com/Dmdv/agentic-ai.git
    cd agentic-ai
    ```
-2. Set up the Python virtual environment:
+2. Set up the Python virtual environment and install the MLX/MCP/Tree-Sitter dependencies:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
    pip install --upgrade pip
-   pip install mlx-lm mcp pydantic-ai mcp-server-git mcp-server-sqlite
+   pip install mlx-lm mcp pydantic-ai mcp-server-git mcp-server-sqlite mcp-server-fetch tree-sitter tree-sitter-python tree-sitter-javascript tree-sitter-typescript tree-sitter-rust tree-sitter-go tree-sitter-dockerfile tree-sitter-yaml tree-sitter-toml tree-sitter-bash tree-sitter-make
    ```
 3. Install the required Node.js MCP servers globally:
    ```bash
    npm install -g @modelcontextprotocol/server-filesystem
-   npm install -g @modelcontextprotocol/server-puppeteer
+   npm install -g @modelcontextprotocol/server-memory
    ```
 
-### Using the Agent via CLI
-The main orchestrator is `mcp_multi_server_loop.py`. You can interact with it by passing a natural language `--prompt` describing the task you want the agent to accomplish.
-
-**Example 1: Basic File System Inspection**
+### 1. Generating the Repository Map
+Before starting the agent, build the Tree-Sitter map of your project:
 ```bash
 source .venv/bin/activate
-python mcp_multi_server_loop.py --prompt "List all the files in the current directory and read the contents of 'README.md' to give me a summary."
+python generate_repo_map.py
+```
+*(This creates a `.repo_map` file that the Architect will ingest).*
+
+### 2. Running the Agent Swarm via CLI
+To unleash the dual-model Swarm on a complex task:
+
+```bash
+python mcp_swarm_loop.py --prompt "I need to deploy this repository. Read the repo map, write a multi-stage Dockerfile, and generate an AWS Terraform configuration to host it via ECS and an ALB."
 ```
 
-**Example 2: Bug Fixing & Autonomous Coding**
+### Changing the Underling Models
+By default, the script uses `Qwen2.5-Coder-32B-Instruct-4bit` for both roles for testing. To utilize massive MoE models (assuming you have 128GB+ of Unified Memory), pass the HuggingFace MLX strings:
 ```bash
-python mcp_multi_server_loop.py --prompt "The code in 'src/main.py' is throwing a KeyError. Please read it, identify the issue, and rewrite the file to fix it."
-```
-
-**Example 3: Git Operations**
-```bash
-python mcp_multi_server_loop.py --prompt "Check the git status. If there are untracked files, create a new branch called 'feat/updates', stage them, and commit with a descriptive message."
-```
-
-**Example 4: Database Engineering (SQLite)**
-```bash
-python mcp_multi_server_loop.py --prompt "Connect to 'agent.db'. Create a 'users' table with id, name, and email. Then insert 3 mock users into it and read them back."
-```
-
-**Example 5: Web Scraping & RAG (Puppeteer)**
-```bash
-python mcp_multi_server_loop.py --prompt "Use your web browsing tools to navigate to 'https://news.ycombinator.com' and list the top 3 headlines."
-```
-
-### Changing the Underling Model
-By default, the script uses `Qwen2.5-Coder-32B-Instruct-4bit` for a fast balance of speed and intelligence. To utilize massive 2026 MoE models (assuming you have 128GB+ of Unified Memory), pass the HuggingFace MLX community string:
-```bash
-python mcp_multi_server_loop.py \
-  --model "mlx-community/Qwen3-Coder-Next-80B-4bit" \
+python mcp_swarm_loop.py \
+  --architect "mlx-community/Kimi-K2.5-1T-4bit" \
+  --engineer "mlx-community/Qwen3-Coder-Next-80B-4bit" \
   --prompt "Refactor the authentication module."
 ```
-*(Note: The model will download from HuggingFace directly into unified memory on the first run).*
 
 ---
 
 ## 🖥 IDE & UI Integration (VS Code / Cursor / Roo Code)
 
-While the Python CLI script is powerful for fully autonomous, background tasks, you will likely want to use this incredible local intelligence directly inside your IDE (Visual Studio Code, Cursor, or Cline/Roo Code).
-
-Because we are using **Apple MLX**, you cannot use standard Ollama API URLs. Instead, you use the `mlx_lm.server` command to spin up an OpenAI-compatible local server.
+While the Python Swarm CLI is powerful for fully autonomous, background tasks, you can use this incredible local intelligence directly inside your IDE (Visual Studio Code, Cursor, or Cline/Roo Code).
 
 ### 1. Start the MLX Local Server
-Open a terminal, activate your virtual environment, and start the server with your preferred model. This will lock the model into your unified memory and expose an API at `http://localhost:8080/v1`.
+Use the `mlx_lm.server` command to lock the model into your unified memory and expose an API at `http://localhost:8080/v1`.
 
 ```bash
 source .venv/bin/activate
@@ -127,18 +121,16 @@ python -m mlx_lm.server --model mlx-community/Qwen3-Coder-Next-80B-4bit --port 8
 ```
 
 ### 2. Configure Your IDE Extension (Cline, Roo Code, or Continue.dev)
-Install an AI coding extension in VS Code (like **Cline**, **Roo Code**, or **Continue**). In their settings UI, configure a new Custom / OpenAI-Compatible provider:
+In their settings UI, configure a new Custom / OpenAI-Compatible provider:
 
 *   **Provider/API Type:** `OpenAI Compatible`
 *   **Base URL:** `http://localhost:8080/v1`
-*   **API Key:** `sk-mock-key` *(Leave blank or put any dummy string)*
-*   **Model ID:** `mlx-community/Qwen3-Coder-Next-80B-4bit` *(Must match exactly what you ran in the server command)*
-*   **Context Length:** `128000` *(Or however high your RAM allows)*
+*   **API Key:** `sk-mock-key`
+*   **Model ID:** `mlx-community/Qwen3-Coder-Next-80B-4bit`
+*   **Context Length:** `128000`
 
 ### 3. Connect the MCP Servers to your IDE
-Extensions like **Cline** and **Roo Code** natively support the Model Context Protocol. You do not need the Python orchestrator script (`mcp_multi_server_loop.py`) when using these UIs. Instead, you add the MCP servers directly to the extension's `mcp.json` file!
-
-Open the extension settings and edit the MCP configuration:
+Extensions like **Cline** and **Roo Code** natively support the Model Context Protocol. Open the extension settings and edit the MCP configuration:
 ```json
 {
   "mcpServers": {
@@ -149,28 +141,25 @@ Open the extension settings and edit the MCP configuration:
     "local-sqlite": {
       "command": "python3",
       "args": ["-m", "mcp_server_sqlite", "--db-path", "/Users/YourName/YourProject/agent.db"]
+    },
+    "local-secure-bash": {
+      "command": "python3",
+      "args": ["/Users/YourName/YourProject/mcp_server_bash.py"]
     }
   }
 }
 ```
-*Now, the AI agent inside VS Code will use your 512GB M3 Ultra to "think", and use the MCP servers defined in VS Code to act on your files and databases.*
+*Now, the AI agent inside VS Code will use your 512GB M3 Ultra to "think", and use the MCP servers defined in VS Code to act on your files and run secure bash tests.*
 
 ---
 
 ## 🔮 What's Next? (Further Capabilities)
 
-The integration of **Apple MLX + Model Context Protocol (MCP)** creates a practically limitless ceiling for what this local AI can do. Because MCP standardizes tool use, you can expand this agent without writing custom Python parsing code. 
-
-Here are the advanced workflows this infrastructure is capable of supporting next:
+The integration of **Apple MLX + Model Context Protocol (MCP)** creates a practically limitless ceiling for what this local AI can do. Here are the advanced workflows this infrastructure is capable of supporting next:
 
 ### 1. "Vibe Coding" & Vision-to-Code
-By swapping the Engineer model to a natively multimodal model (like the `Kimi K2.5` or `Qwen3.5-VL` families) and using `mlx-vlm`, you can feed the agent screenshots of UI designs.
-*   **Workflow:** You drop a Figma screenshot into the folder and type: `"Build a React component that looks exactly like layout.png"`. The agent sees the image, writes the code, and uses the filesystem MCP to save it.
+By swapping the Engineer model to a natively multimodal model (like the `Kimi K2.5` or `Qwen3.5-VL` families) and installing `mlx-vlm`, you can feed the agent screenshots of UI designs.
+*   **Workflow:** You drop a Figma screenshot into the folder and type: `"Build a React component that looks exactly like layout.png"`.
 
-### 2. Autonomous Testing & CI/CD Loops
-By adding an MCP Bash execution server (or creating a secure wrapper for one), you close the iteration loop.
-*   **Workflow:** The agent writes code -> The agent autonomously runs `npm run test` or `cargo build` -> The agent catches its own compiler errors or failed assertions from `stderr` -> The agent edits the code to fix them *before* returning control to you.
-
-### 3. Multi-Agent Swarms
-Since model loading via MLX is near-instantaneous:
-*   **Workflow:** The orchestrator script can be upgraded to boot **Kimi (The Architect)** to write a 10-step plan, and then loop **Qwen3 (The Engineer)** 10 times to execute each step, effectively acting as an entire local development team running concurrently on your M3 Ultra.
+### 2. Structured Diff Editing (Aider Style)
+*   **Improvement:** Implement a custom Python tool that accepts `SEARCH` and `REPLACE` blocks instead of replacing entire files via `write_file`. The Python script would use `difflib` to find the exact 5 lines of code and splice them in, saving massive generation time on 2000+ line files.
