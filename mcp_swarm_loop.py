@@ -73,8 +73,12 @@ The issue resides in `src/auth.py`. We will update the token validation logic.
         
         response = generate(model, tokenizer, prompt=formatted_prompt, max_tokens=4000, verbose=False)
         
-        # We NO LONGER unload the architect here. It stays cached in memory.
-        print("\n[SWARM PHASE 1 COMPLETE]")
+        print("\n[SWARM PHASE 1 COMPLETE] Unloading Architect to free Unified Memory...")
+        del model
+        del tokenizer
+        self._architect = None
+        self._architect_tokenizer = None
+        gc.collect()
         
         # 1. Extract and write the Markdown Specification
         md_match = re.search(r'```markdown\s*(.*?)\s*```', response, re.DOTALL | re.IGNORECASE)
