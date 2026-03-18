@@ -12,7 +12,7 @@ from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
 class MCPAgenticLoop:
-    def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-4bit", keep_in_memory: bool = False):
+    def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-8bit", keep_in_memory: bool = False, persona_file: str = None):
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
@@ -21,8 +21,29 @@ class MCPAgenticLoop:
         # Dictionary to store sessions for multiple servers
         self.sessions = {}
         self.available_tools = {}
+        self.allowed_tool_names = None
         
-        self.system_prompt_template = """You are an expert autonomous Full-Stack and DevOps engineer running locally on an M3 Ultra via Apple MLX.
+        if persona_file and os.path.exists(persona_file):
+            with open(persona_file, 'r') as f:
+                content = f.read()
+                
+                if content.startswith('---'):
+                    parts = content.split('---', 2)
+                    if len(parts) >= 3:
+                        frontmatter = parts[1]
+                        self.system_prompt_template = parts[2].strip() + "\n\nYou have access to the following tools:\n{tool_descriptions}"
+                        
+                        import yaml
+                        try:
+                            meta = yaml.safe_load(frontmatter)
+                            if meta and 'tools' in meta:
+                                self.allowed_tool_names = meta['tools']
+                        except Exception as e:
+                            print(f"Warning parsing persona YAML: {e}")
+                else:
+                    self.system_prompt_template = content + "\n\nYou have access to the following tools:\n{tool_descriptions}"
+        else:
+            self.system_prompt_template = """You are an expert autonomous Full-Stack and DevOps engineer running locally on an M3 Ultra via Apple MLX.
 You are highly capable of writing application code as well as Infrastructure as Code.
 
 CRITICAL INSTRUCTIONS FOR FILE SEARCHING:
@@ -89,10 +110,18 @@ If you do not need to use a tool, output your final answer and explanation.
     def _format_tools(self) -> str:
         descriptions = []
         for server_name, tools in self.available_tools.items():
-            descriptions.append(f"\n--- Tools from {server_name} ---")
+            server_has_tools = False
+            server_tools_str = [f"\n--- Tools from {server_name} ---"]
+            
             for tool in tools:
-                desc = f"- **{tool.name}**: {tool.description}\n  Schema: {json.dumps(tool.inputSchema)}"
-                descriptions.append(desc)
+                if self.allowed_tool_names is None or tool.name in self.allowed_tool_names:
+                    server_has_tools = True
+                    desc = f"- **{tool.name}**: {tool.description}\n  Schema: {json.dumps(tool.inputSchema)}"
+                    server_tools_str.append(desc)
+                    
+            if server_has_tools:
+                descriptions.extend(server_tools_str)
+                
         return "\n".join(descriptions)
 
     async def setup_mcp_servers(self):
