@@ -1,0 +1,1 @@
+# Agentic AI Infrastructure\n\nA local, Apple Silicon-optimized (MLX) agentic coding infrastructure powered by Model Context Protocol (MCP).\n\nBuilt for massive MoE models (Qwen3, Kimi) running natively on Mac Studio (M3 Ultra) to act as autonomous 'Claude Code' alternatives.
