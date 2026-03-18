@@ -21,7 +21,9 @@ class MCPAgenticLoop:
         self.sessions = {}
         self.available_tools = {}
         
-        self.system_prompt_template = """You are an expert autonomous coding agent running locally on an M3 Ultra via Apple MLX.
+        self.system_prompt_template = """You are an expert autonomous Full-Stack and DevOps engineer running locally on an M3 Ultra via Apple MLX.
+You are highly capable of writing application code (Python, JS, Rust) as well as Infrastructure as Code (Terraform, Docker, Kubernetes, CI/CD pipelines).
+
 You have access to the following tools:
 {tool_descriptions}
 
