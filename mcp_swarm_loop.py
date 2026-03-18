@@ -46,31 +46,62 @@ class SwarmOrchestrator:
                 
         system_prompt = """You are the Lead System Architect.
 Your job is to read the user's request and the current repository structure.
-You do NOT write code. You output a JSON array of exact tasks for the Engineer to execute.
+You do NOT write code. You have two responsibilities:
+1. Write a detailed Technical Specification Document in Markdown format wrapped in ```markdown ... ``` tags.
+2. Output a JSON array of exact execution steps for the Engineer wrapped in ```json ... ``` tags.
+
 Example Output:
-["Use bash to run pytest", "Read the failing file", "Rewrite the function to fix the bug", "Run pytest again"]
+```markdown
+# Technical Specification
+## Goal
+Fix the failing auth bug.
+## Architecture
+The issue resides in `src/auth.py`. We will update the token validation logic.
+```
+```json
+["Use bash to run pytest", "Read src/auth.py", "Rewrite the function to fix the bug", "Run pytest again"]
+```
 """
         
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Repo Map:\n{repo_map}\n\nTask: {prompt}\n\nOutput ONLY a valid JSON array of strings representing the steps."}
+            {"role": "user", "content": f"Repo Map:\n{repo_map}\n\nTask: {prompt}\n\nOutput the markdown spec block, followed by the JSON array block."}
         ]
         
         formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         print("Architect is thinking...")
         
-        response = generate(model, tokenizer, prompt=formatted_prompt, max_tokens=2000, verbose=False)
+        response = generate(model, tokenizer, prompt=formatted_prompt, max_tokens=4000, verbose=False)
         
         # We NO LONGER unload the architect here. It stays cached in memory.
         print("\n[SWARM PHASE 1 COMPLETE]")
         
+        # 1. Extract and write the Markdown Specification
+        md_match = re.search(r'```markdown\s*(.*?)\s*```', response, re.DOTALL | re.IGNORECASE)
+        if md_match:
+            spec_content = md_match.group(1).strip()
+            with open("AGENT_PLAN.md", "w") as f:
+                f.write(spec_content)
+            print("-> Successfully wrote Technical Specification to 'AGENT_PLAN.md'")
+        else:
+            print("-> Architect did not provide a markdown specification block.")
+            # Fallback: just dump the raw response if tags failed
+            with open("AGENT_PLAN.md", "w") as f:
+                f.write(response)
+        
+        # 2. Extract and return the JSON array of steps
         try:
-            # Extract JSON array
-            json_str = response[response.find('['):response.rfind(']')+1]
+            json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL | re.IGNORECASE)
+            if json_match:
+                json_str = json_match.group(1).strip()
+            else:
+                # Fallback if the agent forgot the code block
+                json_str = response[response.find('['):response.rfind(']')+1]
+                
             steps = json.loads(json_str)
             return steps
         except Exception as e:
-            print(f"Failed to parse Architect output: {e}\nRaw output: {response}")
+            print(f"Failed to parse Architect JSON output: {e}\nRaw output: {response}")
             return [prompt] # Fallback to giving the engineer the raw prompt
 
     async def run(self, user_prompt: str):
