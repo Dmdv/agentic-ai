@@ -12,8 +12,8 @@ By bypassing traditional `llama.cpp`/GGUF limitations and utilizing **Apple MLX*
 1. [Architectural Paradigm](#-architectural-paradigm)
 2. [Repository Contents](#-repository-contents)
 3. [Quick Start & Usage Guide](#-quick-start--usage-guide)
-4. [The AGENT_PLAN Context Recovery System](#-the-agent_plan-context-recovery-system)
-5. [IDE & UI Integration (VS Code / Cursor)](#-ide--ui-integration-vs-code--cursor--roo-code)
+4. [The AGENT_PLAN.md Context Recovery System](#-the-agent_planmd-context-recovery-system)
+5. [IDE & UI Integration (VS Code / Cursor / Roo Code)](#-ide--ui-integration-vs-code--cursor--roo-code)
 6. [What's Next? (Further Capabilities)](#-whats-next-further-capabilities)
 
 ---
