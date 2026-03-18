@@ -72,7 +72,7 @@ The Python orchestrator spins up multiple background MCP Servers (`@modelcontext
    npm install -g @modelcontextprotocol/server-puppeteer
    ```
 
-### Using the Agent
+### Using the Agent via CLI
 The main orchestrator is `mcp_multi_server_loop.py`. You can interact with it by passing a natural language `--prompt` describing the task you want the agent to accomplish.
 
 **Example 1: Basic File System Inspection**
@@ -109,6 +109,51 @@ python mcp_multi_server_loop.py \
   --prompt "Refactor the authentication module."
 ```
 *(Note: The model will download from HuggingFace directly into unified memory on the first run).*
+
+---
+
+## 🖥 IDE & UI Integration (VS Code / Cursor / Roo Code)
+
+While the Python CLI script is powerful for fully autonomous, background tasks, you will likely want to use this incredible local intelligence directly inside your IDE (Visual Studio Code, Cursor, or Cline/Roo Code).
+
+Because we are using **Apple MLX**, you cannot use standard Ollama API URLs. Instead, you use the `mlx_lm.server` command to spin up an OpenAI-compatible local server.
+
+### 1. Start the MLX Local Server
+Open a terminal, activate your virtual environment, and start the server with your preferred model. This will lock the model into your unified memory and expose an API at `http://localhost:8080/v1`.
+
+```bash
+source .venv/bin/activate
+python -m mlx_lm.server --model mlx-community/Qwen3-Coder-Next-80B-4bit --port 8080
+```
+
+### 2. Configure Your IDE Extension (Cline, Roo Code, or Continue.dev)
+Install an AI coding extension in VS Code (like **Cline**, **Roo Code**, or **Continue**). In their settings UI, configure a new Custom / OpenAI-Compatible provider:
+
+*   **Provider/API Type:** `OpenAI Compatible`
+*   **Base URL:** `http://localhost:8080/v1`
+*   **API Key:** `sk-mock-key` *(Leave blank or put any dummy string)*
+*   **Model ID:** `mlx-community/Qwen3-Coder-Next-80B-4bit` *(Must match exactly what you ran in the server command)*
+*   **Context Length:** `128000` *(Or however high your RAM allows)*
+
+### 3. Connect the MCP Servers to your IDE
+Extensions like **Cline** and **Roo Code** natively support the Model Context Protocol. You do not need the Python orchestrator script (`mcp_multi_server_loop.py`) when using these UIs. Instead, you add the MCP servers directly to the extension's `mcp.json` file!
+
+Open the extension settings and edit the MCP configuration:
+```json
+{
+  "mcpServers": {
+    "local-filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/YourName/YourProject"]
+    },
+    "local-sqlite": {
+      "command": "python3",
+      "args": ["-m", "mcp_server_sqlite", "--db-path", "/Users/YourName/YourProject/agent.db"]
+    }
+  }
+}
+```
+*Now, the AI agent inside VS Code will use your 512GB M3 Ultra to "think", and use the MCP servers defined in VS Code to act on your files and databases.*
 
 ---
 
