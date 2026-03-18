@@ -224,7 +224,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the MLX Multi-Server Agentic Loop.")
     parser.add_argument("--prompt", type=str, default="Use the 'fetch' tool to read https://example.com and summarize it.",
                         help="The initial user prompt.")
-    parser.add_argument("--model", type=str, default="mlx-community/Qwen3-Coder-Next-80B-4bit",
+    parser.add_argument("--model", type=str, default="mlx-community/Qwen3-Coder-Next-80B-8bit",
                         help="HuggingFace model ID (must be an MLX format model).")
     
     args = parser.parse_args()
