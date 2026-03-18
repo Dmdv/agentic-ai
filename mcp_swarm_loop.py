@@ -48,34 +48,45 @@ class SwarmOrchestrator:
         available_agents = []
         if os.path.exists("agents"):
             for file in os.listdir("agents"):
-                if file.endswith(".md"):
+                if file.endswith(".md") and file != "architect.md":
                     available_agents.append(file)
         
         agents_list = ", ".join(available_agents) if available_agents else "None (Use default engineer)"
                 
-        system_prompt = f"""You are the Lead System Architect.
+        # Load Architect Persona dynamically
+        system_prompt = ""
+        architect_file = "agents/architect.md"
+        if os.path.exists(architect_file):
+            with open(architect_file, 'r') as f:
+                content = f.read()
+                if content.startswith('---'):
+                    parts = content.split('---', 2)
+                    if len(parts) >= 3:
+                        system_prompt = parts[2].strip()
+        
+        # Fallback if file missing
+        if not system_prompt:
+            system_prompt = f"""You are the Lead System Architect.
 Your job is to read the user's request and the current repository structure.
 You do NOT write code. You have two responsibilities:
 1. Write a detailed Technical Specification Document in Markdown format wrapped in ```markdown ... ``` tags.
 2. Output a JSON array of exact execution steps for the Engineering Swarm. Crucially, for each step, you must select the best specialized agent from the available agents list to execute it. Wrap this array in ```json ... ``` tags.
-
-Available Specialized Agents in `agents/` directory: {agents_list}
 
 Example Output:
 ```markdown
 # Technical Specification
 ## Goal
 Fix the failing auth bug.
-## Architecture
-The issue resides in `src/auth.py`. We will update the token validation logic.
 ```
 ```json
 [
-  {{"task": "Use bash to run pytest and find the error", "agent": "test-fixer.md"}},
   {{"task": "Read src/auth.py and rewrite the function to fix the bug", "agent": "devops-automation-engineer.md"}}
 ]
 ```
 """
+        
+        # Inject the dynamic agents list into the prompt
+        system_prompt = system_prompt.replace("{agents_list}", agents_list)
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -103,7 +114,6 @@ The issue resides in `src/auth.py`. We will update the token validation logic.
             print("-> Successfully wrote Technical Specification to 'AGENT_PLAN.md'")
         else:
             print("-> Architect did not provide a markdown specification block.")
-            # Fallback: just dump the raw response if tags failed
             with open("AGENT_PLAN.md", "w") as f:
                 f.write(response)
         
@@ -113,17 +123,26 @@ The issue resides in `src/auth.py`. We will update the token validation logic.
             if json_match:
                 json_str = json_match.group(1).strip()
             else:
-                # Fallback if the agent forgot the code block
                 json_str = response[response.find('['):response.rfind(']')+1]
                 
             steps = json.loads(json_str)
-            # Ensure backwards compatibility if the agent just outputs a list of strings
             if isinstance(steps, list) and len(steps) > 0 and isinstance(steps[0], str):
                 steps = [{"task": s, "agent": None} for s in steps]
+                
+            # MANDATORY CRITICAL REVIEW PHASE
+            # We automatically inject the Critical Reviewer at the end of every plan
+            steps.append({
+                "task": "Review all changes made during this run against the AGENT_PLAN.md. Run any tests or linters. If flawed, provide fix instructions. If perfect, output 'REVIEW PASSED'.",
+                "agent": "critical-reviewer.md"
+            })
+            
             return steps
         except Exception as e:
             print(f"Failed to parse Architect JSON output: {e}\nRaw output: {response}")
-            return [{"task": prompt, "agent": None}] # Fallback to giving the engineer the raw prompt
+            return [
+                {"task": prompt, "agent": None},
+                {"task": "Review the previous execution against requirements.", "agent": "critical-reviewer.md"}
+            ]
 
     async def run(self, user_prompt: str):
         print(f"=== INITIALIZING AGENT SWARM ===")
