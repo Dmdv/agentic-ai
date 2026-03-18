@@ -8,6 +8,16 @@ By bypassing traditional `llama.cpp`/GGUF limitations and utilizing **Apple MLX*
 
 ---
 
+## 📑 Table of Contents
+1. [Architectural Paradigm](#-architectural-paradigm)
+2. [Repository Contents](#-repository-contents)
+3. [Quick Start & Usage Guide](#-quick-start--usage-guide)
+4. [The AGENT_PLAN Context Recovery System](#-the-agent_plan-context-recovery-system)
+5. [IDE & UI Integration (VS Code / Cursor)](#-ide--ui-integration-vs-code--cursor--roo-code)
+6. [What's Next? (Further Capabilities)](#-whats-next-further-capabilities)
+
+---
+
 ## 🏗 Architectural Paradigm
 
 ### 1. Apple MLX Native
@@ -19,9 +29,9 @@ This infrastructure uses `mlx-lm`. MLX treats macOS Unified Memory as direct arr
 We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using a swarm of open-weight MoE models (as of Q1 2026). MoEs are strictly superior for Apple Silicon because they provide the reasoning of massive models while keeping active parameters low, maximizing the Mac's ~800GB/s memory bandwidth.
 
 Our `mcp_swarm_loop.py` script orchestrates two distinct personas:
-*   **Phase 1: The Architect (e.g., Kimi K2.5 - 1T MoE)**
-    *   *Role:* Ingests the entire repository map and user prompt. It is strictly forbidden from writing code. Instead, it outputs a pristine JSON array of sequential steps (The Plan). It is then instantly unloaded from RAM.
-*   **Phase 2: The Engineer (e.g., Qwen3-Coder-Next - 80B MoE)**
+*   **Phase 1: The Architect (e.g., Qwen3-235B - 8-bit)**
+    *   *Role:* Ingests the entire repository map and user prompt. It is strictly forbidden from writing code. Instead, it outputs a pristine JSON array of sequential steps and writes a master Markdown specification (`AGENT_PLAN.md`). It is then instantly unloaded from RAM to free up compute.
+*   **Phase 2: The Engineer (e.g., Qwen3-Coder-Next - 80B 8-bit)**
     *   *Role:* Loads into RAM, boots the MCP servers, and iteratively executes every step in the Architect's plan. At only 3B active parameters, it generates code and searches files at blistering speeds (150+ tokens/second).
 
 ### 3. Tree-Sitter Polyglot Repo Mapping
@@ -83,7 +93,7 @@ Instead of hardcoding custom Python tools, the Engineer model interacts with you
    ```
 
 ### 1. Generating the Repository Map
-Before starting the agent, build the Tree-Sitter map of your project:
+Before starting the agent, build the Tree-Sitter map of your project. This must be run whenever you add new files or functions.
 ```bash
 source .venv/bin/activate
 python generate_repo_map.py
@@ -98,13 +108,25 @@ python mcp_swarm_loop.py --prompt "I need to deploy this repository. Read the re
 ```
 
 ### Changing the Underling Models
-By default, the script uses `Qwen2.5-Coder-32B-Instruct-4bit` for both roles for testing. To utilize massive MoE models (assuming you have 128GB+ of Unified Memory), pass the HuggingFace MLX strings:
+By default, the script uses `Qwen3-235B` (Architect) and `Qwen3-Coder-Next-80B` (Engineer). To test with smaller/faster models, pass the HuggingFace MLX strings:
 ```bash
 python mcp_swarm_loop.py \
-  --architect "mlx-community/Kimi-K2.5-1T-4bit" \
-  --engineer "mlx-community/Qwen3-Coder-Next-80B-4bit" \
+  --architect "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit" \
+  --engineer "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit" \
   --prompt "Refactor the authentication module."
 ```
+
+---
+
+## ⚓ The `AGENT_PLAN.md` Context Recovery System
+
+A massive flaw in traditional single-agent LLM loops is "Context Degradation." If an agent executes 10 complex file edits, its context window fills with thousands of lines of terminal logs and code diffs. By step 8, it forgets the original architecture it was trying to build.
+
+**The Swarm solves this using the `AGENT_PLAN.md` anchor file.**
+
+1.  **Creation:** During Phase 1, the Architect model writes a highly detailed Markdown specification containing the master goal, the chosen architecture, and the required logic. The Python script physically saves this to `AGENT_PLAN.md`.
+2.  **Recovery:** The Engineer's system prompt contains a strict directive: *"If you ever lose context of the overall goal or architecture, you should use your file tools to read `AGENT_PLAN.md`."*
+3.  **Result:** If the Engineer gets confused deep into a debugging loop, it will autonomously pause, read the master specification file off the local disk, re-align itself with the Architect's original vision, and continue coding without hallucinating.
 
 ---
 
@@ -117,7 +139,7 @@ Use the `mlx_lm.server` command to lock the model into your unified memory and e
 
 ```bash
 source .venv/bin/activate
-python -m mlx_lm.server --model mlx-community/Qwen3-Coder-Next-80B-4bit --port 8080
+python -m mlx_lm.server --model mlx-community/Qwen3-Coder-Next-80B-8bit --port 8080
 ```
 
 ### 2. Configure Your IDE Extension (Cline, Roo Code, or Continue.dev)
@@ -126,7 +148,7 @@ In their settings UI, configure a new Custom / OpenAI-Compatible provider:
 *   **Provider/API Type:** `OpenAI Compatible`
 *   **Base URL:** `http://localhost:8080/v1`
 *   **API Key:** `sk-mock-key`
-*   **Model ID:** `mlx-community/Qwen3-Coder-Next-80B-4bit`
+*   **Model ID:** `mlx-community/Qwen3-Coder-Next-80B-8bit`
 *   **Context Length:** `128000`
 
 ### 3. Connect the MCP Servers to your IDE
