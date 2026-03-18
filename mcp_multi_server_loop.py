@@ -12,10 +12,11 @@ from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
 class MCPAgenticLoop:
-    def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-4bit"):
+    def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-4bit", keep_in_memory: bool = False):
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
+        self.keep_in_memory = keep_in_memory
         
         # Dictionary to store sessions for multiple servers
         self.sessions = {}
@@ -49,7 +50,7 @@ If you do not need to use a tool, output your final answer and explanation.
             self.model, self.tokenizer = load(self.model_name)
             
     def _unload_model(self):
-        if self.model is not None:
+        if self.model is not None and not self.keep_in_memory:
             print(f"Unloading {self.model_name} to free unified memory...")
             del self.model
             del self.tokenizer

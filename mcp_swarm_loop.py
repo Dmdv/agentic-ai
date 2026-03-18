@@ -11,12 +11,32 @@ from mcp_multi_server_loop import MCPAgenticLoop
 
 class SwarmOrchestrator:
     def __init__(self, architect_model: str, engineer_model: str):
-        self.architect_model = architect_model
-        self.engineer_model = engineer_model
+        self.architect_model_name = architect_model
+        self.engineer_model_name = engineer_model
+        
+        # Cache the models in memory so we don't reload from disk
+        self._architect = None
+        self._architect_tokenizer = None
+        
+        self._engineer_agent = None
+        
+    def _get_architect(self):
+        if self._architect is None:
+            print(f"\n[SWARM] Loading Architect ({self.architect_model_name}) into RAM (Cached)...")
+            self._architect, self._architect_tokenizer = load(self.architect_model_name)
+        return self._architect, self._architect_tokenizer
+
+    def _get_engineer_agent(self):
+        if self._engineer_agent is None:
+            print(f"\n[SWARM] Loading Engineer ({self.engineer_model_name}) into RAM (Cached)...")
+            self._engineer_agent = MCPAgenticLoop(model_name=self.engineer_model_name, keep_in_memory=True)
+            # Pre-load the engineer's model so it stays in RAM
+            self._engineer_agent._load_model()
+        return self._engineer_agent
         
     def _run_architect(self, prompt: str) -> List[str]:
-        print(f"\n[SWARM PHASE 1] Loading Architect ({self.architect_model})...")
-        model, tokenizer = load(self.architect_model)
+        print(f"\n[SWARM PHASE 1] Architect is planning...")
+        model, tokenizer = self._get_architect()
         
         # Load repo map to give the architect full context
         repo_map = ""
@@ -41,10 +61,8 @@ Example Output:
         
         response = generate(model, tokenizer, prompt=formatted_prompt, max_tokens=2000, verbose=False)
         
-        print("\n[SWARM PHASE 1 COMPLETE] Unloading Architect...")
-        del model
-        del tokenizer
-        gc.collect()
+        # We NO LONGER unload the architect here. It stays cached in memory.
+        print("\n[SWARM PHASE 1 COMPLETE]")
         
         try:
             # Extract JSON array
@@ -65,9 +83,9 @@ Example Output:
             print(f"  {i+1}. {step}")
             
         # Phase 2: Execution
-        print(f"\n[SWARM PHASE 2] Handing off to Engineer ({self.engineer_model})...")
+        print(f"\n[SWARM PHASE 2] Handing off to Engineer...")
         
-        engineer = MCPAgenticLoop(model_name=self.engineer_model)
+        engineer = self._get_engineer_agent()
         
         # We loop through each step in the Architect's plan, starting a new agent loop for each
         for i, step in enumerate(steps):
@@ -75,6 +93,9 @@ Example Output:
             await engineer.run(user_prompt=step)
             
         print("\n=== SWARM EXECUTION COMPLETE ===")
+        
+        # Optional: You could add a manual cleanup here, but for a CLI tool, 
+        # the OS will reclaim the memory when the python script exits.
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Multi-Agent Swarm.")
