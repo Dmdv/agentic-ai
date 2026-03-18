@@ -4,10 +4,15 @@ import gc
 import json
 import sys
 import os
+import re
 from typing import List, Dict, Any
 
+from dotenv import load_dotenv
 from mlx_lm import load, generate
 from mcp_multi_server_loop import MCPAgenticLoop
+
+# Load environment variables (e.g. HF_TOKEN) from .env file
+load_dotenv()
 
 class SwarmOrchestrator:
     def __init__(self, architect_model: str, engineer_model: str):

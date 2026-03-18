@@ -7,9 +7,13 @@ import sys
 import os
 from typing import List, Dict, Any, Optional
 
+from dotenv import load_dotenv
 from mlx_lm import load, generate
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
+
+# Load environment variables (e.g. HF_TOKEN) from .env file
+load_dotenv()
 
 class MCPAgenticLoop:
     def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-8bit", keep_in_memory: bool = False, persona_file: str = None):
