@@ -27,7 +27,7 @@ We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using the lates
 
 ### 3. Model Context Protocol (MCP)
 Instead of hardcoding custom Python tools for file reading or bash execution, the loop utilizes the **Model Context Protocol**. 
-The Python orchestrator spins up multiple background MCP Servers (e.g., `@modelcontextprotocol/server-filesystem` and `mcp-server-git`), aggregates their JSON schemas, and dynamically injects them into the Qwen Engineer model to grant it physical access to the local machine.
+The Python orchestrator spins up multiple background MCP Servers (`@modelcontextprotocol/server-filesystem`, `mcp-server-git`, `mcp-server-sqlite`, and `@modelcontextprotocol/server-puppeteer`), aggregates their JSON schemas, and dynamically injects them into the Qwen Engineer model to grant it physical access to the local machine.
 
 ---
 
@@ -41,7 +41,7 @@ The Python orchestrator spins up multiple background MCP Servers (e.g., `@modelc
 *   `test_mlx.py`: A basic script to verify Apple MLX is installed and can rapidly load, generate, and dump an Instruct model from memory.
 *   `agentic_loop.py`: A foundational mock loop demonstrating how Qwen outputs JSON tool-calls when prompted.
 *   `mcp_agentic_loop.py`: A functional loop wired to a single MCP Server (Filesystem) to allow the agent to read and write real files.
-*   `mcp_multi_server_loop.py`: The advanced orchestrator. It boots multiple distinct MCP servers (Filesystem + Git), aggregates all available tools into a massive schema, and intelligently routes the agent's tool calls to the correct background process.
+*   `mcp_multi_server_loop.py`: The advanced orchestrator. It boots **four distinct MCP servers** (Filesystem, Git, SQLite, and Puppeteer), aggregates all available tools into a massive schema, and intelligently routes the agent's tool calls to the correct background process.
 
 ---
 
@@ -64,7 +64,12 @@ The Python orchestrator spins up multiple background MCP Servers (e.g., `@modelc
    python3 -m venv .venv
    source .venv/bin/activate
    pip install --upgrade pip
-   pip install mlx-lm mcp pydantic-ai mcp-server-git
+   pip install mlx-lm mcp pydantic-ai mcp-server-git mcp-server-sqlite
+   ```
+3. Install the required Node.js MCP servers globally:
+   ```bash
+   npm install -g @modelcontextprotocol/server-filesystem
+   npm install -g @modelcontextprotocol/server-puppeteer
    ```
 
 ### Using the Agent
@@ -84,6 +89,16 @@ python mcp_multi_server_loop.py --prompt "The code in 'src/main.py' is throwing 
 **Example 3: Git Operations**
 ```bash
 python mcp_multi_server_loop.py --prompt "Check the git status. If there are untracked files, create a new branch called 'feat/updates', stage them, and commit with a descriptive message."
+```
+
+**Example 4: Database Engineering (SQLite)**
+```bash
+python mcp_multi_server_loop.py --prompt "Connect to 'agent.db'. Create a 'users' table with id, name, and email. Then insert 3 mock users into it and read them back."
+```
+
+**Example 5: Web Scraping & RAG (Puppeteer)**
+```bash
+python mcp_multi_server_loop.py --prompt "Use your web browsing tools to navigate to 'https://news.ycombinator.com' and list the top 3 headlines."
 ```
 
 ### Changing the Underling Model
@@ -111,14 +126,6 @@ By swapping the Engineer model to a natively multimodal model (like the `Kimi K2
 By adding an MCP Bash execution server (or creating a secure wrapper for one), you close the iteration loop.
 *   **Workflow:** The agent writes code -> The agent autonomously runs `npm run test` or `cargo build` -> The agent catches its own compiler errors or failed assertions from `stderr` -> The agent edits the code to fix them *before* returning control to you.
 
-### 3. Database Migration & SQL Operations
-By attaching the `mcp-server-postgres` or `mcp-server-sqlite` tools:
-*   **Workflow:** Prompt the agent: `"Analyze our current PostgreSQL schema. Write and execute a migration to add a 'stripe_customer_id' column to the users table, and update the ORM models to match."` The agent will query the database directly to understand the schema, write the SQL, and patch the Python/Node code.
-
-### 4. Agentic Web Scraping & Research
-By attaching tools like `@modelcontextprotocol/server-puppeteer`:
-*   **Workflow:** You encounter an undocumented error. You prompt: `"The latest version of Next.js is throwing Error X. Search the Next.js GitHub issues via Puppeteer, find the recommended workaround, and apply it to my code."` The agent launches a headless browser, reads the GitHub issues, and applies the community fix.
-
-### 5. Multi-Agent Swarms
+### 3. Multi-Agent Swarms
 Since model loading via MLX is near-instantaneous:
 *   **Workflow:** The orchestrator script can be upgraded to boot **Kimi (The Architect)** to write a 10-step plan, and then loop **Qwen3 (The Engineer)** 10 times to execute each step, effectively acting as an entire local development team running concurrently on your M3 Ultra.
