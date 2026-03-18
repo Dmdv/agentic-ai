@@ -257,9 +257,11 @@ if __name__ == "__main__":
                         help="The initial user prompt.")
     parser.add_argument("--model", type=str, default="mlx-community/Qwen3-Coder-Next-80B-8bit",
                         help="HuggingFace model ID (must be an MLX format model).")
+    parser.add_argument("--persona", type=str, default=None,
+                        help="Path to a markdown file defining the agent's persona and tool whitelist.")
     
     args = parser.parse_args()
-    agent = MCPAgenticLoop(model_name=args.model)
+    agent = MCPAgenticLoop(model_name=args.model, persona_file=args.persona)
     
     try:
         asyncio.run(agent.run(user_prompt=args.prompt))
