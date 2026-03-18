@@ -223,8 +223,8 @@ Fix the failing auth bug.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Multi-Agent Swarm.")
     parser.add_argument("--prompt", type=str, required=True, help="The overall task for the Swarm.")
-    parser.add_argument("--architect", type=str, default="mlx-community/Qwen3-235B-8bit", help="The planning model.")
-    parser.add_argument("--engineer", type=str, default="mlx-community/Qwen3-Coder-Next-80B-8bit", help="The executing model.")
+    parser.add_argument("--architect", type=str, default="mlx-community/Qwen2.5-72B-Instruct-8bit", help="The planning model.")
+    parser.add_argument("--engineer", type=str, default="mlx-community/Qwen2.5-72B-Instruct-8bit", help="The executing model.")
     
     args = parser.parse_args()
     
