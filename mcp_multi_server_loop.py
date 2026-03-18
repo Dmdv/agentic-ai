@@ -4,6 +4,7 @@ import gc
 import json
 import re
 import sys
+import os
 from typing import List, Dict, Any, Optional
 
 from mlx_lm import load, generate
@@ -87,8 +88,7 @@ If you do not need to use a tool, output your final answer and explanation.
         return "\n".join(descriptions)
 
     async def setup_mcp_servers(self):
-        """Initializes multiple MCP servers (Filesystem, Git, SQLite, Puppeteer)."""
-        import os
+        """Initializes all required MCP servers."""
         allowed_dir = os.path.abspath(".")
         db_path = os.path.join(allowed_dir, "agent.db")
         
@@ -104,35 +104,37 @@ If you do not need to use a tool, output your final answer and explanation.
             args=["-m", "mcp_server_git", "--repository", allowed_dir],
         )
         
-        # 3. SQLite Server (Python/pip) - for Database Operations
+        # 3. SQLite Server (Python/pip)
         sqlite_params = StdioServerParameters(
-            command="python3",
-            args=["-m", "mcp_server_sqlite", "--db-path", db_path],
+            command="mcp-server-sqlite",
+            args=["--db-path", db_path],
         )
         
-        # 4. Puppeteer Server (Node/npx) - for Web Scraping and RAG
-        puppeteer_params = StdioServerParameters(
+        # 4. Fetch Server (Python/pip) - Better for direct RAG than Puppeteer
+        fetch_params = StdioServerParameters(
+            command="mcp-server-fetch",
+            args=[],
+        )
+        
+        # 5. Memory Server (Node/npx) - For multi-agent context sharing
+        memory_params = StdioServerParameters(
             command="npx",
-            args=["-y", "@modelcontextprotocol/server-puppeteer"],
+            args=["-y", "@modelcontextprotocol/server-memory"],
         )
 
         servers = {
             "Filesystem": fs_params,
             "Git": git_params,
             "SQLite": sqlite_params,
-            "Puppeteer": puppeteer_params
+            "Fetch": fetch_params,
+            "Memory": memory_params
         }
 
-        # NOTE: For a production agent, context managers (async with) must be kept open 
-        # for the duration of the loop. To keep this script simple and flat, 
-        # we will connect to the servers right before executing the tool.
         self.server_configs = servers
 
     async def execute_tool_call(self, tool_name: str, tool_kwargs: dict) -> str:
-        """Finds which server owns the tool, boots the connection, executes, and closes."""
         target_server_name = None
         
-        # Find which server has the tool
         for server_name, tools in self.available_tools.items():
             if any(t.name == tool_name for t in tools):
                 target_server_name = server_name
@@ -143,7 +145,6 @@ If you do not need to use a tool, output your final answer and explanation.
 
         params = self.server_configs[target_server_name]
         
-        # Connect, execute, disconnect (in production, use persistent connections)
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -155,7 +156,6 @@ If you do not need to use a tool, output your final answer and explanation.
         
         await self.setup_mcp_servers()
         
-        # Initial discovery phase (boot up servers briefly to learn their tools)
         print("Discovering tools from servers...")
         for name, params in self.server_configs.items():
             try:
@@ -168,7 +168,6 @@ If you do not need to use a tool, output your final answer and explanation.
             except Exception as e:
                 print(f"Failed to connect to {name} server: {e}")
 
-        # Format system prompt with actual tools
         system_prompt = self.system_prompt_template.format(
             tool_descriptions=self._format_tools()
         )
@@ -178,7 +177,7 @@ If you do not need to use a tool, output your final answer and explanation.
             {"role": "user", "content": f"Task: {user_prompt}"}
         ]
         
-        max_iterations = 8
+        max_iterations = 10
         
         for i in range(max_iterations):
             print(f"\n--- Iteration {i+1} ---")
@@ -196,7 +195,7 @@ If you do not need to use a tool, output your final answer and explanation.
                 
                 try:
                     result_text = await self.execute_tool_call(tool_name, tool_kwargs)
-                    print(f"[Tool Result]:\n{result_text[:500]}... (truncated if long)")
+                    print(f"[Tool Result]:\n{result_text[:1000]}... (truncated if long)")
                     messages.append({"role": "user", "content": f"Tool '{tool_name}' result:\n{result_text}"})
                 except Exception as e:
                     error_msg = f"Error executing tool '{tool_name}': {str(e)}"
@@ -210,7 +209,7 @@ If you do not need to use a tool, output your final answer and explanation.
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the MLX Multi-Server Agentic Loop.")
-    parser.add_argument("--prompt", type=str, default="Use your tools to check the git status of this repository.",
+    parser.add_argument("--prompt", type=str, default="Use the 'fetch' tool to read https://example.com and summarize it.",
                         help="The initial user prompt.")
     parser.add_argument("--model", type=str, default="mlx-community/Qwen2.5-Coder-32B-Instruct-4bit",
                         help="HuggingFace model ID (must be an MLX format model).")
