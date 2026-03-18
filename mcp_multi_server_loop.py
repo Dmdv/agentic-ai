@@ -111,7 +111,9 @@ If you do not need to use a tool, output your final answer and explanation.
         json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
         if json_match:
             try:
-                return json.loads(json_match.group(1))
+                parsed = json.loads(json_match.group(1))
+                if isinstance(parsed, dict) and "tool" in parsed:
+                    return parsed
             except json.JSONDecodeError:
                 return None
         return None
