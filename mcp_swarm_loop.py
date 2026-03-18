@@ -34,7 +34,7 @@ class SwarmOrchestrator:
             self._engineer_agent._load_model()
         return self._engineer_agent
         
-    def _run_architect(self, prompt: str) -> List[str]:
+    def _run_architect(self, prompt: str) -> List[Dict[str, str]]:
         print(f"\n[SWARM PHASE 1] Architect is planning...")
         model, tokenizer = self._get_architect()
         
@@ -44,11 +44,22 @@ class SwarmOrchestrator:
             with open(".repo_map", "r") as f:
                 repo_map = f.read()
                 
-        system_prompt = """You are the Lead System Architect.
+        # Load available personas dynamically
+        available_agents = []
+        if os.path.exists("agents"):
+            for file in os.listdir("agents"):
+                if file.endswith(".md"):
+                    available_agents.append(file)
+        
+        agents_list = ", ".join(available_agents) if available_agents else "None (Use default engineer)"
+                
+        system_prompt = f"""You are the Lead System Architect.
 Your job is to read the user's request and the current repository structure.
 You do NOT write code. You have two responsibilities:
 1. Write a detailed Technical Specification Document in Markdown format wrapped in ```markdown ... ``` tags.
-2. Output a JSON array of exact execution steps for the Engineer wrapped in ```json ... ``` tags.
+2. Output a JSON array of exact execution steps for the Engineering Swarm. Crucially, for each step, you must select the best specialized agent from the available agents list to execute it. Wrap this array in ```json ... ``` tags.
+
+Available Specialized Agents in `agents/` directory: {agents_list}
 
 Example Output:
 ```markdown
@@ -59,7 +70,10 @@ Fix the failing auth bug.
 The issue resides in `src/auth.py`. We will update the token validation logic.
 ```
 ```json
-["Use bash to run pytest", "Read src/auth.py", "Rewrite the function to fix the bug", "Run pytest again"]
+[
+  {{"task": "Use bash to run pytest and find the error", "agent": "test-fixer.md"}},
+  {{"task": "Read src/auth.py and rewrite the function to fix the bug", "agent": "devops-automation-engineer.md"}}
+]
 ```
 """
         
@@ -103,29 +117,53 @@ The issue resides in `src/auth.py`. We will update the token validation logic.
                 json_str = response[response.find('['):response.rfind(']')+1]
                 
             steps = json.loads(json_str)
+            # Ensure backwards compatibility if the agent just outputs a list of strings
+            if isinstance(steps, list) and len(steps) > 0 and isinstance(steps[0], str):
+                steps = [{"task": s, "agent": None} for s in steps]
             return steps
         except Exception as e:
             print(f"Failed to parse Architect JSON output: {e}\nRaw output: {response}")
-            return [prompt] # Fallback to giving the engineer the raw prompt
+            return [{"task": prompt, "agent": None}] # Fallback to giving the engineer the raw prompt
 
     async def run(self, user_prompt: str):
         print(f"=== INITIALIZING AGENT SWARM ===")
+        
+        # Automatically generate the repo map first!
+        print("\n[SWARM] Auto-generating Repository Map...")
+        import generate_repo_map
+        full_map = generate_repo_map.generate_repo_map(".")
+        with open(".repo_map", "w") as f:
+            f.write(full_map)
+        print("[SWARM] Repository Map generated and saved.")
         
         # Phase 1: Planning
         steps = self._run_architect(user_prompt)
         print(f"\nArchitect Plan:")
         for i, step in enumerate(steps):
-            print(f"  {i+1}. {step}")
+            task = step.get("task", "")
+            agent = step.get("agent", "Default Engineer")
+            print(f"  {i+1}. [{agent}] -> {task}")
             
         # Phase 2: Execution
-        print(f"\n[SWARM PHASE 2] Handing off to Engineer...")
+        print(f"\n[SWARM PHASE 2] Handing off to Engineering Swarm...")
         
         engineer = self._get_engineer_agent()
         
         # We loop through each step in the Architect's plan, starting a new agent loop for each
         for i, step in enumerate(steps):
-            print(f"\n=== ENGINEER EXECUTING STEP {i+1}/{len(steps)}: {step} ===")
-            await engineer.run(user_prompt=step)
+            task = step.get("task", "")
+            agent_file = step.get("agent")
+            
+            # Hot-swap the persona if specified
+            if agent_file and os.path.exists(os.path.join("agents", agent_file)):
+                print(f"\n=== SWARM HOT-SWAP: Loading '{agent_file}' Persona ===")
+                engineer.set_persona(os.path.join("agents", agent_file))
+            else:
+                print(f"\n=== SWARM HOT-SWAP: Reverting to Default Engineer Persona ===")
+                engineer.set_persona(None)
+                
+            print(f"\n=== EXECUTING STEP {i+1}/{len(steps)}: {task} ===")
+            await engineer.run(user_prompt=task)
             
         print("\n=== SWARM EXECUTION COMPLETE ===")
         

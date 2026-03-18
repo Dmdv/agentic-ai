@@ -23,6 +23,11 @@ class MCPAgenticLoop:
         self.available_tools = {}
         self.allowed_tool_names = None
         
+        self.set_persona(persona_file)
+
+    def set_persona(self, persona_file: str = None):
+        """Dynamically hot-swaps the agent's persona and tool whitelist without reloading the model weights."""
+        self.allowed_tool_names = None
         if persona_file and os.path.exists(persona_file):
             with open(persona_file, 'r') as f:
                 content = f.read()
