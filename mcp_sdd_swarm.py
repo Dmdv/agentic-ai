@@ -72,8 +72,10 @@ class SDDSwarmOrchestrator:
             await engineer.run(user_prompt=review_prompt)
             
             # Check if passed
-            with open("REVIEW_REPORT.md", "r") as f:
-                review_content = f.read()
+            review_content = ""
+            if os.path.exists("REVIEW_REPORT.md"):
+                with open("REVIEW_REPORT.md", "r") as f:
+                    review_content = f.read()
                 
             if "REVIEW PASSED" in review_content:
                 print(f"\n[SWARM] Specification approved by Reviewers!")

@@ -2,6 +2,7 @@
 name: critical-reviewer
 tools:
   - read_text_file
+  - write_file
   - run_bash_command
   - list_directory
   - search_files
