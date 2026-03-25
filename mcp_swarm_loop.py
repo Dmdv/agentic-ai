@@ -49,18 +49,21 @@ class SwarmOrchestrator:
             with open(".repo_map", "r") as f:
                 repo_map = f.read()
                 
-        # Load available personas dynamically
+        # Load available personas dynamically from all subdirectories
         available_agents = []
         if os.path.exists("agents"):
-            for file in os.listdir("agents"):
-                if file.endswith(".md") and file != "architect.md":
-                    available_agents.append(file)
+            for root, dirs, files in os.walk("agents"):
+                for file in files:
+                    if file.endswith(".md") and file != "architect.md":
+                        # We store the relative path (e.g. qa/test-fixer.md) so the Engineer knows exactly where to load it from
+                        rel_path = os.path.relpath(os.path.join(root, file), "agents")
+                        available_agents.append(rel_path)
         
         agents_list = ", ".join(available_agents) if available_agents else "None (Use default engineer)"
                 
         # Load Architect Persona dynamically
         system_prompt = ""
-        architect_file = "agents/architect.md"
+        architect_file = "agents/core/architect.md"
         if os.path.exists(architect_file):
             with open(architect_file, 'r') as f:
                 content = f.read()
@@ -138,7 +141,7 @@ Fix the failing auth bug.
             # We automatically inject the Critical Reviewer at the end of every plan
             steps.append({
                 "task": "Review all changes made during this run against the AGENT_PLAN.md. Run any tests or linters. If flawed, provide fix instructions. If perfect, output 'REVIEW PASSED'.",
-                "agent": "critical-reviewer.md"
+                "agent": "core/critical-reviewer.md"
             })
             
             return steps
@@ -146,7 +149,7 @@ Fix the failing auth bug.
             print(f"Failed to parse Architect JSON output: {e}\nRaw output: {response}")
             return [
                 {"task": prompt, "agent": None},
-                {"task": "Review the previous execution against requirements.", "agent": "critical-reviewer.md"}
+                {"task": "Review the previous execution against requirements.", "agent": "core/critical-reviewer.md"}
             ]
 
     async def run(self, user_prompt: str):
