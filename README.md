@@ -96,6 +96,33 @@ Instead of hardcoding custom Python tools, the Engineer model interacts with you
 
 ---
 
+## 🔑 HuggingFace Authentication (For Qwen3)
+
+The most powerful models in this repository (like `Qwen3-235B` or `Qwen3-Coder-Next-80B`) are "gated" by HuggingFace. You must accept their license agreement online before downloading them.
+
+To allow the Apple MLX engine to securely download these massive weights into your unified memory, you must provide your HuggingFace Access Token.
+
+1.  Create a `.env` file in the root of your project.
+2.  Add your HuggingFace token:
+    ```env
+    HF_TOKEN=hf_YourActualTokenStringHere
+    ```
+The Python orchestrator will automatically load this `.env` file into memory, instantly bypassing the `401 Unauthorized` block and initializing the massive download on the first run.
+
+---
+
+## ⚓ The `AGENT_PLAN.md` Context Recovery System
+
+A massive flaw in traditional single-agent LLM loops is "Context Degradation." If an agent executes 10 complex file edits, its context window fills with thousands of lines of terminal logs and code diffs. By step 8, it forgets the original architecture it was trying to build.
+
+**The Swarm solves this using the `AGENT_PLAN.md` anchor file.**
+
+1.  **Creation:** During Phase 1, the Architect model writes a highly detailed Markdown specification containing the master goal, the chosen architecture, and the required logic. The Python script physically saves this to `AGENT_PLAN.md`.
+2.  **Recovery:** The Engineer's system prompt contains a strict directive: *"If you ever lose context of the overall goal or architecture, you should use your file tools to read `AGENT_PLAN.md`."*
+3.  **Result:** If the Engineer gets confused deep into a debugging loop, it will autonomously pause, read the master specification file off the local disk, re-align itself with the Architect's original vision, and continue coding without hallucinating.
+
+---
+
 ## 🛠 Daily Interactive Development (VS Code / Cline)
 
 Is the Python CLI the only way to develop? **Absolutely not.** The Python orchestrator scripts we built (`mcp_sdd_swarm.py`) are known as **"Headless Orchestrators."** They are designed for fire-and-forget automation (e.g., "Here is a massive refactor, run overnight, fix your own bugs, and leave a report when I wake up").
