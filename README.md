@@ -12,9 +12,10 @@ By bypassing traditional `llama.cpp`/GGUF limitations and utilizing **Apple MLX*
 1. [Architectural Paradigm](#-architectural-paradigm)
 2. [Repository Contents](#-repository-contents)
 3. [Quick Start & Usage Guide](#-quick-start--usage-guide)
-4. [The AGENT_PLAN.md Context Recovery System](#-the-agent_planmd-context-recovery-system)
-5. [IDE & UI Integration (VS Code / Cursor / Roo Code)](#-ide--ui-integration-vs-code--cursor--roo-code)
-6. [What's Next? (Further Capabilities)](#-whats-next-further-capabilities)
+4. [HuggingFace Authentication (For Qwen3)](#-huggingface-authentication-for-qwen3)
+5. [The AGENT_PLAN.md Context Recovery System](#-the-agent_planmd-context-recovery-system)
+6. [IDE & UI Integration (VS Code / Cursor / Roo Code)](#-ide--ui-integration-vs-code--cursor--roo-code)
+7. [What's Next? (Further Capabilities)](#-whats-next-further-capabilities)
 
 ---
 
@@ -115,6 +116,21 @@ python mcp_swarm_loop.py \
   --engineer "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit" \
   --prompt "Refactor the authentication module."
 ```
+
+---
+
+## 🔑 HuggingFace Authentication (For Qwen3)
+
+The most powerful models in this repository (like `Qwen3-235B` or `Qwen3-Coder-Next-80B`) are "gated" by HuggingFace. You must accept their license agreement online before downloading them.
+
+To allow the Apple MLX engine to securely download these massive weights into your unified memory, you must provide your HuggingFace Access Token.
+
+1.  Create a `.env` file in the root of your project.
+2.  Add your HuggingFace token:
+    ```env
+    HF_TOKEN=hf_YourActualTokenStringHere
+    ```
+The Python orchestrator will automatically load this `.env` file into memory, instantly bypassing the `401 Unauthorized` block and initializing the massive download on the first run.
 
 ---
 
