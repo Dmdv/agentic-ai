@@ -196,10 +196,23 @@ Fix the failing auth bug.
             report_lines.append(f"\n### Step {i+1}: {task}")
             
             # Hot-swap the persona if specified
-            if agent_file and os.path.exists(os.path.join("agents", agent_file)):
-                print(f"\n=== SWARM HOT-SWAP: Loading '{agent_file}' Persona ===")
-                report_lines.append(f"- **Persona Loaded:** `{agent_file}`")
-                engineer.set_persona(os.path.join("agents", agent_file))
+            found_persona_path = None
+            if agent_file:
+                # First try exact path
+                exact_path = os.path.join("agents", agent_file)
+                if os.path.exists(exact_path):
+                    found_persona_path = exact_path
+                else:
+                    # Fallback: search through the agents directory for the filename
+                    for root, dirs, files in os.walk("agents"):
+                        if os.path.basename(agent_file) in files:
+                            found_persona_path = os.path.join(root, os.path.basename(agent_file))
+                            break
+                            
+            if found_persona_path:
+                print(f"\n=== SWARM HOT-SWAP: Loading '{found_persona_path}' Persona ===")
+                report_lines.append(f"- **Persona Loaded:** `{found_persona_path}`")
+                engineer.set_persona(found_persona_path)
             else:
                 print(f"\n=== SWARM HOT-SWAP: Reverting to Default Engineer Persona ===")
                 report_lines.append("- **Persona Loaded:** `Default Engineer`")
