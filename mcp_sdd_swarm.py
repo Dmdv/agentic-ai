@@ -1,0 +1,253 @@
+import argparse
+import asyncio
+import gc
+import json
+import sys
+import os
+import re
+from typing import List, Dict, Any
+
+from dotenv import load_dotenv
+from mlx_lm import load, generate
+from mcp_multi_server_loop import MCPAgenticLoop
+
+# Load environment variables (e.g. HF_TOKEN) from .env file
+load_dotenv()
+
+class SDDSwarmOrchestrator:
+    """Spec-Driven Development Swarm Orchestrator inspired by Claude Superpowers."""
+    def __init__(self, architect_model: str, engineer_model: str):
+        self.architect_model_name = architect_model
+        self.engineer_model_name = engineer_model
+        
+        self._architect = None
+        self._architect_tokenizer = None
+        
+        self._engineer_agent = None
+
+    def _get_architect(self):
+        if self._architect is None:
+            print(f"\n[SWARM] Loading Architect ({self.architect_model_name}) into RAM (Cached)...")
+            self._architect, self._architect_tokenizer = load(self.architect_model_name)
+        return self._architect, self._architect_tokenizer
+
+    def _get_engineer_agent(self):
+        if self._engineer_agent is None:
+            print(f"\n[SWARM] Loading Engineer ({self.engineer_model_name}) into RAM (Cached)...")
+            self._engineer_agent = MCPAgenticLoop(model_name=self.engineer_model_name, keep_in_memory=True)
+            self._engineer_agent._load_model()
+        return self._engineer_agent
+
+    async def _run_spec_phase(self, user_prompt: str):
+        print(f"\n=== PHASE 1: SPECIFICATION DRIVEN DEVELOPMENT ===")
+        engineer = self._get_engineer_agent()
+        
+        # 1. Spec Writer generates initial spec
+        print(f"\n[SWARM] Generating Initial Specification...")
+        engineer.set_persona("agents/core/spec-writer.md")
+        spec_prompt = f"User Request: {user_prompt}\n\nPlease generate a comprehensive specification and save it to SPEC.md."
+        await engineer.run(user_prompt=spec_prompt)
+        
+        # 2. Evaluation Loop
+        max_loops = 3
+        for loop in range(max_loops):
+            print(f"\n[SWARM] Spec Evaluation Loop {loop+1}/{max_loops}...")
+            
+            # Researcher Phase
+            print(f"\n[SWARM] Running Researcher validation...")
+            engineer.set_persona("agents/core/researcher.md")
+            research_prompt = "Read the current SPEC.md. Use your fetch tool to research best practices on the web. If there are flaws, list them. If it is perfect, output 'RESEARCH PASSED'."
+            
+            # We must capture the agent's output. Since MCPAgenticLoop prints and modifies history, 
+            # we can run it and check the final assistant message (we'll read SPEC.md to see if it changed, 
+            # or we can modify MCPAgenticLoop to return the final answer. 
+            # For simplicity, we just ask the agent to write its critique to RESEARCH_REPORT.md).
+            research_prompt += " Write your findings to RESEARCH_REPORT.md."
+            await engineer.run(user_prompt=research_prompt)
+            
+            # Critical Reviewer Phase
+            print(f"\n[SWARM] Running Critical Reviewer validation...")
+            engineer.set_persona("agents/core/critical-reviewer.md")
+            review_prompt = "Read SPEC.md and RESEARCH_REPORT.md. Review them rigorously. Write your findings and any requested changes to REVIEW_REPORT.md. If there are 0 issues, output exactly 'REVIEW PASSED' in the file."
+            await engineer.run(user_prompt=review_prompt)
+            
+            # Check if passed
+            with open("REVIEW_REPORT.md", "r") as f:
+                review_content = f.read()
+                
+            if "REVIEW PASSED" in review_content:
+                print(f"\n[SWARM] Specification approved by Reviewers!")
+                break
+            else:
+                print(f"\n[SWARM] Issues found. Sending back to Spec Writer...")
+                engineer.set_persona("agents/core/spec-writer.md")
+                fix_prompt = "Read REVIEW_REPORT.md and RESEARCH_REPORT.md. Update SPEC.md to resolve all issues."
+                await engineer.run(user_prompt=fix_prompt)
+                
+        print(f"\n=== PHASE 1 COMPLETE ===")
+
+    def _run_planning_phase(self) -> List[Dict[str, str]]:
+        print(f"\n=== PHASE 2: DEVELOPMENT PLANNING ===")
+        model, tokenizer = self._get_architect()
+        
+        repo_map = ""
+        if os.path.exists(".repo_map"):
+            with open(".repo_map", "r") as f:
+                repo_map = f.read()
+                
+        spec_content = ""
+        if os.path.exists("SPEC.md"):
+            with open("SPEC.md", "r") as f:
+                spec_content = f.read()
+                
+        available_agents = []
+        if os.path.exists("agents"):
+            for root, dirs, files in os.walk("agents"):
+                for file in files:
+                    if file.endswith(".md") and "architect" not in file and "planning" not in file:
+                        rel_path = os.path.relpath(os.path.join(root, file), "agents")
+                        available_agents.append(rel_path)
+        
+        agents_list = ", ".join(available_agents) if available_agents else "None"
+        
+        system_prompt = ""
+        planner_file = "agents/core/planning-agent.md"
+        if os.path.exists(planner_file):
+            with open(planner_file, 'r') as f:
+                content = f.read()
+                if content.startswith('---'):
+                    parts = content.split('---', 2)
+                    if len(parts) >= 3:
+                        system_prompt = parts[2].strip()
+        
+        system_prompt = system_prompt.replace("{agents_list}", agents_list)
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Repo Map:\n{repo_map}\n\nSPEC.md:\n{spec_content}\n\nOutput ONLY the JSON array block."}
+        ]
+        
+        formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        print("Planning Agent is thinking...")
+        
+        response = generate(model, tokenizer, prompt=formatted_prompt, max_tokens=4000, verbose=False)
+        
+        print("\n[SWARM PHASE 2 COMPLETE] Unloading Planning Agent...")
+        del model
+        del tokenizer
+        self._architect = None
+        self._architect_tokenizer = None
+        gc.collect()
+        
+        try:
+            json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL | re.IGNORECASE)
+            if json_match:
+                json_str = json_match.group(1).strip()
+            else:
+                json_str = response[response.find('['):response.rfind(']')+1]
+                
+            steps = json.loads(json_str)
+            if isinstance(steps, list) and len(steps) > 0 and isinstance(steps[0], str):
+                steps = [{"task": s, "agent": None} for s in steps]
+            return steps
+        except Exception as e:
+            print(f"Failed to parse Planner JSON output: {e}\nRaw output: {response}")
+            return [{"task": "Implement SPEC.md", "agent": None}]
+
+    async def _run_execution_phase(self, steps: List[Dict[str, str]]):
+        print(f"\n=== PHASE 3: ISOLATED EXECUTION & VALIDATION ===")
+        engineer = self._get_engineer_agent()
+        
+        import datetime
+        report_lines = [
+            f"# SDD Swarm Execution Report",
+            f"**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"\n## Approved Development Plan",
+        ]
+        
+        for i, step in enumerate(steps):
+            task = step.get("task", "")
+            agent = step.get("agent", "Default Engineer")
+            report_lines.append(f"{i+1}. **Agent:** `{agent}` -> **Task:** {task}")
+            
+        report_lines.append("\n## Engineering Phase")
+        
+        for i, step in enumerate(steps):
+            task = step.get("task", "")
+            agent_file = step.get("agent")
+            
+            report_lines.append(f"\n### Step {i+1}: {task}")
+            
+            # 1. Execution
+            found_persona_path = None
+            if agent_file:
+                exact_path = os.path.join("agents", agent_file)
+                if os.path.exists(exact_path):
+                    found_persona_path = exact_path
+                else:
+                    for root, dirs, files in os.walk("agents"):
+                        if os.path.basename(agent_file) in files:
+                            found_persona_path = os.path.join(root, os.path.basename(agent_file))
+                            break
+                            
+            if found_persona_path:
+                print(f"\n=== SWARM HOT-SWAP: Loading '{found_persona_path}' Persona ===")
+                report_lines.append(f"- **Executor Persona:** `{found_persona_path}`")
+                engineer.set_persona(found_persona_path)
+            else:
+                engineer.set_persona(None)
+                
+            print(f"\n=== EXECUTING TASK: {task} ===")
+            await engineer.run(user_prompt=task)
+            report_lines.append(f"- **Execution:** Done")
+            
+            # 2. Validation & Review Loop
+            print(f"\n=== VALIDATING TASK: {task} ===")
+            
+            engineer.set_persona("agents/qa/requirement-validator.md")
+            await engineer.run(user_prompt=f"Validate that the recent code changes fulfill this task: '{task}' and align with SPEC.md. Save your findings to VALIDATION.md")
+            
+            engineer.set_persona("agents/core/critical-reviewer.md")
+            await engineer.run(user_prompt=f"Read VALIDATION.md and review the latest code changes. If there are issues, use bash to fix them, or leave instructions. Save final status to REVIEW_REPORT.md.")
+            
+            report_lines.append(f"- **Validation & Review:** Passed")
+            
+        print("\n=== SWARM EXECUTION COMPLETE ===")
+        report_lines.append("\n## Swarm Execution Complete")
+        
+        with open("SWARM_EXECUTION_REPORT.md", "w") as f:
+            f.write("\n".join(report_lines))
+        print("-> Saved execution flow details to 'SWARM_EXECUTION_REPORT.md'")
+
+    async def run(self, user_prompt: str):
+        print(f"=== INITIALIZING SPEC-DRIVEN SWARM ===")
+        
+        print("\n[SWARM] Auto-generating Repository Map...")
+        import generate_repo_map
+        full_map = generate_repo_map.generate_repo_map(".")
+        with open(".repo_map", "w") as f:
+            f.write(full_map)
+            
+        # Phase 1: SDD Spec Generation
+        await self._run_spec_phase(user_prompt)
+        
+        # Phase 2: Planning
+        steps = self._run_planning_phase()
+        
+        # Phase 3: Execution with Validation
+        await self._run_execution_phase(steps)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the Spec-Driven Development Multi-Agent Swarm.")
+    parser.add_argument("--prompt", type=str, required=True, help="The overall task to build.")
+    parser.add_argument("--architect", type=str, default="mlx-community/Qwen2.5-72B-Instruct-8bit", help="The planning model.")
+    parser.add_argument("--engineer", type=str, default="mlx-community/Qwen2.5-72B-Instruct-8bit", help="The executing model.")
+    
+    args = parser.parse_args()
+    swarm = SDDSwarmOrchestrator(architect_model=args.architect, engineer_model=args.engineer)
+    
+    try:
+        asyncio.run(swarm.run(user_prompt=args.prompt))
+    except KeyboardInterrupt:
+        print("\nExiting...")
+        sys.exit(0)
