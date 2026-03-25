@@ -11,11 +11,12 @@ By bypassing traditional `llama.cpp`/GGUF limitations and utilizing **Apple MLX*
 ## 📑 Table of Contents
 1. [Architectural Paradigm](#-architectural-paradigm)
 2. [Repository Contents](#-repository-contents)
-3. [Quick Start & Usage Guide](#-quick-start--usage-guide)
+3. [Quick Start & Setup](#-quick-start--setup)
 4. [HuggingFace Authentication (For Qwen3)](#-huggingface-authentication-for-qwen3)
-5. [The AGENT_PLAN.md Context Recovery System](#-the-agent_planmd-context-recovery-system)
-6. [IDE & UI Integration (VS Code / Cursor / Roo Code)](#-ide--ui-integration-vs-code--cursor--roo-code)
-7. [What's Next? (Further Capabilities)](#-whats-next-further-capabilities)
+5. [Daily Interactive Development (VS Code / Cline)](#-daily-interactive-development-vs-code--cline)
+6. [Spec-Driven Development (The Headless Swarm)](#-spec-driven-development-the-headless-swarm)
+7. [The AGENT_PLAN.md Context Recovery System](#-the-agent_planmd-context-recovery-system)
+8. [What's Next? (Further Capabilities)](#-whats-next-further-capabilities)
 
 ---
 
@@ -93,82 +94,33 @@ Instead of hardcoding custom Python tools, the Engineer model interacts with you
    npm install -g @modelcontextprotocol/server-memory
    ```
 
-### 1. Generating the Repository Map
-Before starting the agent, build the Tree-Sitter map of your project. This must be run whenever you add new files or functions.
+---
+
+## 🛠 Daily Interactive Development (VS Code / Cline)
+
+Is the Python CLI the only way to develop? **Absolutely not.** The Python orchestrator scripts we built (`mcp_sdd_swarm.py`) are known as **"Headless Orchestrators."** They are designed for fire-and-forget automation (e.g., "Here is a massive refactor, run overnight, fix your own bugs, and leave a report when I wake up").
+
+For your daily, interactive coding, you should use a visual IDE extension (like **Cline** or **Roo Code**) inside VS Code. 
+
+Here is how you develop interactively with your local MLX LLM:
+
+### 1. Start the Brain
+In a terminal, lock the model into your M3 Ultra's RAM and create a local API:
 ```bash
 source .venv/bin/activate
-python generate_repo_map.py
-```
-*(This creates a `.repo_map` file that the Architect will ingest).*
-
-### 2. Running the Agent Swarm via CLI
-To unleash the dual-model Swarm on a complex task:
-
-```bash
-python mcp_swarm_loop.py --prompt "I need to deploy this repository. Read the repo map, write a multi-stage Dockerfile, and generate an AWS Terraform configuration to host it via ECS and an ALB."
+python -m mlx_lm.server --model mlx-community/Qwen3-235B-8bit --port 8080
 ```
 
-### Changing the Underling Models
-By default, the script uses `Qwen3-235B` (Architect) and `Qwen3-Coder-Next-80B` (Engineer). To test with smaller/faster models, pass the HuggingFace MLX strings:
-```bash
-python mcp_swarm_loop.py \
-  --architect "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit" \
-  --engineer "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit" \
-  --prompt "Refactor the authentication module."
-```
-
----
-
-## 🔑 HuggingFace Authentication (For Qwen3)
-
-The most powerful models in this repository (like `Qwen3-235B` or `Qwen3-Coder-Next-80B`) are "gated" by HuggingFace. You must accept their license agreement online before downloading them.
-
-To allow the Apple MLX engine to securely download these massive weights into your unified memory, you must provide your HuggingFace Access Token.
-
-1.  Create a `.env` file in the root of your project.
-2.  Add your HuggingFace token:
-    ```env
-    HF_TOKEN=hf_YourActualTokenStringHere
-    ```
-The Python orchestrator will automatically load this `.env` file into memory, instantly bypassing the `401 Unauthorized` block and initializing the massive download on the first run.
-
----
-
-## ⚓ The `AGENT_PLAN.md` Context Recovery System
-
-A massive flaw in traditional single-agent LLM loops is "Context Degradation." If an agent executes 10 complex file edits, its context window fills with thousands of lines of terminal logs and code diffs. By step 8, it forgets the original architecture it was trying to build.
-
-**The Swarm solves this using the `AGENT_PLAN.md` anchor file.**
-
-1.  **Creation:** During Phase 1, the Architect model writes a highly detailed Markdown specification containing the master goal, the chosen architecture, and the required logic. The Python script physically saves this to `AGENT_PLAN.md`.
-2.  **Recovery:** The Engineer's system prompt contains a strict directive: *"If you ever lose context of the overall goal or architecture, you should use your file tools to read `AGENT_PLAN.md`."*
-3.  **Result:** If the Engineer gets confused deep into a debugging loop, it will autonomously pause, read the master specification file off the local disk, re-align itself with the Architect's original vision, and continue coding without hallucinating.
-
----
-
-## 🖥 IDE & UI Integration (VS Code / Cursor / Roo Code)
-
-While the Python Swarm CLI is powerful for fully autonomous, background tasks, you can use this incredible local intelligence directly inside your IDE (Visual Studio Code, Cursor, or Cline/Roo Code).
-
-### 1. Start the MLX Local Server
-Use the `mlx_lm.server` command to lock the model into your unified memory and expose an API at `http://localhost:8080/v1`.
-
-```bash
-source .venv/bin/activate
-python -m mlx_lm.server --model mlx-community/Qwen3-Coder-Next-80B-8bit --port 8080
-```
-
-### 2. Configure Your IDE Extension (Cline, Roo Code, or Continue.dev)
-In their settings UI, configure a new Custom / OpenAI-Compatible provider:
-
+### 2. Configure the GUI
+Open VS Code and install the **Cline** extension. In its settings, configure the custom provider:
 *   **Provider/API Type:** `OpenAI Compatible`
 *   **Base URL:** `http://localhost:8080/v1`
 *   **API Key:** `sk-mock-key`
-*   **Model ID:** `mlx-community/Qwen3-Coder-Next-80B-8bit`
+*   **Model ID:** `mlx-community/Qwen3-235B-8bit`
 *   **Context Length:** `128000`
 
-### 3. Connect the MCP Servers to your IDE
-Extensions like **Cline** and **Roo Code** natively support the Model Context Protocol. Open the extension settings and edit the MCP configuration:
+### 3. Connect the Hands (MCP)
+In the extension settings, attach your MCP servers (Filesystem, Bash, SQLite) via the UI:
 ```json
 {
   "mcpServers": {
@@ -179,15 +131,52 @@ Extensions like **Cline** and **Roo Code** natively support the Model Context Pr
     "local-sqlite": {
       "command": "python3",
       "args": ["-m", "mcp_server_sqlite", "--db-path", "/Users/YourName/YourProject/agent.db"]
-    },
-    "local-secure-bash": {
-      "command": "python3",
-      "args": ["/Users/YourName/YourProject/mcp_server_bash.py"]
     }
   }
 }
 ```
-*Now, the AI agent inside VS Code will use your 512GB M3 Ultra to "think", and use the MCP servers defined in VS Code to act on your files and run secure bash tests.*
+*Now, you have a beautiful chat window in VS Code. When the agent wants to run a Bash command or edit a file, it pops up a clean GUI prompt asking for your approval. You can see the diffs visually, watch it think, and interrupt it instantly.*
+
+---
+
+## 🚀 Spec-Driven Development (The Headless Swarm)
+
+Jumping straight into coding ("vibe coding") fails on large projects. This repository features a completely autonomous, Headless Orchestrator (`mcp_sdd_swarm.py`) inspired by the **Claude Superpowers** plugin methodology.
+
+It utilizes 4 highly specialized agents from the `agents/` folder:
+*   `spec-writer.md`
+*   `researcher.md` (uses web tools to read modern documentation)
+*   `planning-agent.md`
+*   `requirement-validator.md`
+
+### How the SDD Swarm Works:
+
+**Phase 1: Spec Generation & Critique Loop**
+1. The `spec-writer` takes your initial prompt and creates a `SPEC.md` document detailing the architecture, edge cases, and requirements.
+2. The `researcher` reads `SPEC.md`, uses its web-fetch tool to check documentation, and writes critiques to `RESEARCH_REPORT.md`.
+3. The `critical-reviewer` rigorously reads the spec to ensure there are no logical gaps.
+4. If issues are found, the orchestrator sends it back to the `spec-writer`. **It loops this process until the Reviewer outputs exactly "REVIEW PASSED".**
+
+**Phase 2: Structured Planning**
+Once `SPEC.md` is perfect, the Swarm loads the `planning-agent`. It breaks the Spec down into a JSON array of micro-tasks and assigns specific agents to them. 
+
+**Phase 3: Execution with Mandatory TDD Validations**
+The Orchestrator loops through the plan. For *every single task* the Engineer completes, the Python script forcefully interrupts and injects two steps:
+1. **Validation:** It hot-swaps to the `requirement-validator.md` to ensure the new code actually fulfills the `SPEC.md`. 
+2. **Review:** It hot-swaps to `critical-reviewer.md` to run the tests via bash. If the tests fail, the Engineer is forced to fix them before moving to the next task on the list.
+
+### Running the SDD Swarm
+
+1. Generate your `.repo_map`:
+```bash
+python generate_repo_map.py
+```
+
+2. Unleash the Swarm:
+```bash
+python mcp_sdd_swarm.py --prompt "I need a complete Python FastAPI backend for a library management system with JWT authentication and SQLite."
+```
+*(The Swarm will run autonomously for hours, generating the specs, breaking down the tasks, and writing the test-driven code. Read the resulting `SWARM_EXECUTION_REPORT.md` when it finishes).*
 
 ---
 
