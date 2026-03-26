@@ -16,17 +16,19 @@ from mcp.client.session import ClientSession
 load_dotenv()
 
 class MCPAgenticLoop:
+    _generation_lock = asyncio.Lock()  # Class-level lock to serialize MLX Metal generation
+
     def __init__(self, model_name: str = "mlx-community/Qwen3-235B-8bit", keep_in_memory: bool = False, persona_file: str = None, preloaded_model=None, preloaded_tokenizer=None):
         self.model_name = model_name
         self.model = preloaded_model
         self.tokenizer = preloaded_tokenizer
         self.keep_in_memory = keep_in_memory
-
+        
         # Dictionary to store sessions for multiple servers
         self.sessions = {}
         self.available_tools = {}
         self.allowed_tool_names = None
-
+        
         self.set_persona(persona_file)
 
     def set_persona(self, persona_file: str = None):
@@ -97,17 +99,21 @@ If you do not need to use a tool, output your final answer and explanation.
             tokenize=False,
             add_generation_prompt=True
         )
-        print("\nModel is generating (This may take longer if using a Thinking model)...")
-        # Run generation in a separate thread so it doesn't block the async event loop
-        # We increase max_tokens to 8000 because Thinking models use thousands of tokens for internal logic
-        response = await asyncio.to_thread(
-            generate,
-            self.model,
-            self.tokenizer,
-            prompt=prompt,
-            max_tokens=8000,
-            verbose=False
-        )
+        print("\nModel is queued for generation...")
+        
+        # Serialize access to the MLX generation engine to prevent Metal driver crashes
+        # during parallel swarm execution.
+        async with self._generation_lock:
+            print("\nModel is generating (This may take longer if using a Thinking model)...")
+            # Run generation in a separate thread so it doesn't block the async event loop
+            response = await asyncio.to_thread(
+                generate,
+                self.model,
+                self.tokenizer,
+                prompt=prompt,
+                max_tokens=8000,
+                verbose=False
+            )
         
         # Intercept and strip <think> blocks (DeepSeek-R1 / QwQ format)
         think_match = re.search(r'<think>(.*?)</think>', response, re.DOTALL | re.IGNORECASE)
@@ -232,8 +238,14 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
     async def setup_mcp_servers(self):
         """Initializes all required MCP servers."""
         import os
+        import sys
+        
         allowed_dir = os.path.abspath(".")
         db_path = os.path.join(allowed_dir, "agent.db")
+        
+        # Use the absolute path to the current virtual environment's python
+        # to guarantee we never use the global system python.
+        venv_python = sys.executable
         
         # 1. Filesystem Server (Node/npx)
         fs_params = StdioServerParameters(
@@ -243,7 +255,7 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
         
         # 2. Git Server (Python/pip)
         git_params = StdioServerParameters(
-            command="python3",
+            command=venv_python,
             args=["-m", "mcp_server_git", "--repository", allowed_dir],
         )
         
@@ -267,19 +279,19 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
         
         # 6. Custom Bash Server (Python) - For CI/CD and Testing
         bash_params = StdioServerParameters(
-            command="python3",
+            command=venv_python,
             args=["mcp_server_bash.py"],
         )
         
         # 7. Surgical Diff Server (Python) - For Aider-style file editing
         diff_params = StdioServerParameters(
-            command="python3",
+            command=venv_python,
             args=["mcp_server_diff.py"],
         )
         
         # 8. Vision Server (Python) - For multimodal UI validation
         vision_params = StdioServerParameters(
-            command="python3",
+            command=venv_python,
             args=["mcp_server_vision.py"],
         )
 
