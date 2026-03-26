@@ -114,8 +114,9 @@ If you do not need to use a tool, output your final answer and explanation.
         Multi-Dimensional Context Compaction: Prevents context rot by asking the LLM 
         to semantically summarize the older history into a dense state object.
         """
-        # Only compact if the history gets too long (e.g., > 8 messages)
-        if len(messages) <= 8:
+        # Only compact if the history gets too long.
+        # Increased to 20 to take advantage of Qwen3's massive 128k context window.
+        if len(messages) <= 20:
             return messages
             
         print("\n[SYSTEM] Context window threshold reached. Initiating Multi-Dimensional Compaction...")
