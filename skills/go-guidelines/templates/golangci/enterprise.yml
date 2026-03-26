@@ -1,0 +1,213 @@
+# golangci-lint configuration - Enterprise Tier
+# For: Large codebases, strict compliance requirements
+# Copy to: .golangci.yml in project root
+
+run:
+  timeout: 10m
+  go: "1.22"
+
+linters:
+  disable-all: true
+  enable:
+    # All Strict tier linters
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - gosec
+    - revive
+    - gocritic
+    - prealloc
+    - noctx
+    - exhaustive
+    - errname
+    - nilnil
+    - nilerr
+    - bodyclose
+
+    # Complexity limits
+    - gocyclo       # Cyclomatic complexity
+    - gocognit      # Cognitive complexity
+    - funlen        # Function length
+    - nestif        # Nested if depth
+
+    # Code duplication
+    - dupl          # Code clone detection
+
+    # Error handling strictness
+    - wrapcheck     # Check error wrapping
+    - forcetypeassert # Prevent unchecked type assertions
+
+    # Code hygiene
+    - godox         # Detect TODO/FIXME/BUG
+    - unparam       # Reports unused function parameters
+    - nakedret      # Naked returns in long functions
+
+    # Test quality
+    - testpackage   # Require _test package
+    - tparallel     # Detect misuse of t.Parallel()
+
+    # Additional checks
+    - makezero      # Find slice declarations not zeroed
+    - predeclared   # Find shadowed predeclared identifiers
+    - bidichk       # Check dangerous unicode characters
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+
+  staticcheck:
+    checks:
+      - "all"
+
+  goimports:
+    local-prefixes: github.com/yourorg
+
+  revive:
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+      - name: confusing-naming
+      - name: confusing-results
+      - name: modifies-parameter
+      - name: deep-exit
+      - name: flag-parameter
+      - name: unnecessary-stmt
+      - name: struct-tag
+      - name: modifies-value-receiver
+      - name: constant-logical-expr
+      - name: bool-literal-in-expr
+      - name: imports-blocklist
+      - name: range-val-in-closure
+      - name: range-val-address
+      - name: waitgroup-by-value
+      - name: atomic
+      - name: call-to-gc
+      - name: duplicated-imports
+      - name: string-of-int
+      - name: defer
+      - name: unconditional-recursion
+      - name: identical-branches
+      - name: get-return
+      - name: early-return
+      - name: useless-break
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+
+  gosec:
+    excludes:
+      - G104
+
+  gocyclo:
+    min-complexity: 15
+
+  gocognit:
+    min-complexity: 20
+
+  funlen:
+    lines: 80
+    statements: 50
+
+  nestif:
+    min-complexity: 5
+
+  dupl:
+    threshold: 100
+
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Unwrap(
+      - .Wrap(
+      - .Wrapf(
+      - .WithMessage(
+      - .WithStack(
+
+  nakedret:
+    max-func-lines: 30
+
+  godox:
+    keywords:
+      - TODO
+      - FIXME
+      - BUG
+      - HACK
+
+issues:
+  max-issues-per-linter: 100
+  max-same-issues: 5
+  new: false  # Show all issues, not just new ones
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - gocritic
+        - dupl
+        - funlen
+        - gocognit
+        - wrapcheck
+
+    - path: mock_
+      linters:
+        - revive
+        - gocritic
+
+    - path: cmd/
+      linters:
+        - wrapcheck  # Entry points don't need to wrap
+
+    # Allow longer lines in generated code
+    - source: "^//go:generate"
+      linters:
+        - lll
+
+severity:
+  default-severity: warning
+  rules:
+    - linters:
+        - gosec
+        - errcheck
+      severity: error

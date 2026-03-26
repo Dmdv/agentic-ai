@@ -1,0 +1,31 @@
+# golangci-lint configuration - Minimal Tier
+# For: Prototypes, learning, quick starts
+# Copy to: .golangci.yml in project root
+
+run:
+  timeout: 5m
+  go: "1.22"
+
+linters:
+  disable-all: true
+  enable:
+    # Essential linters only
+    - errcheck      # Check that error return values are used
+    - govet         # Reports suspicious constructs
+    - staticcheck   # Static analysis checks
+    - unused        # Checks for unused constants, variables, functions
+
+linters-settings:
+  errcheck:
+    # Check for unchecked errors in type assertions
+    check-type-assertions: true
+
+  staticcheck:
+    checks:
+      - "all"
+      - "-SA1019"  # Allow deprecated (for migration)
+
+issues:
+  # Maximum issues count per one linter
+  max-issues-per-linter: 50
+  max-same-issues: 10

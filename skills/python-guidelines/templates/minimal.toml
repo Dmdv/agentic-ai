@@ -1,0 +1,61 @@
+# ==============================================================================
+# Python Project Configuration - MINIMAL TIER
+# ==============================================================================
+# Quick start for scripts, prototypes, and small projects.
+# Tools: Ruff (lint+format), mypy (strict), pytest
+# Upgrade to: standard.toml when project grows
+# ==============================================================================
+
+[project]
+name = "my-project"
+version = "0.1.0"
+description = "Project description"
+requires-python = ">=3.14"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pytest>=8.0.0",
+]
+
+# ==============================================================================
+# RUFF - Linter & Formatter (replaces black, isort, flake8)
+# ==============================================================================
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+# Minimal rule set - catches obvious errors
+select = [
+    "E",   # pycodestyle errors (syntax, indentation)
+    "F",   # Pyflakes (undefined names, unused imports)
+    "I",   # isort (import sorting)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# ==============================================================================
+# MYPY - Static Type Checker
+# ==============================================================================
+[tool.mypy]
+python_version = "3.14"
+strict = true
+ignore_missing_imports = true
+show_error_codes = true
+
+# Relax for tests
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# ==============================================================================
+# PYTEST - Testing Framework
+# ==============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = ["-v", "--strict-markers"]

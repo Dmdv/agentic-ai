@@ -1,0 +1,134 @@
+# ==============================================================================
+# Python Project Configuration - STANDARD TIER
+# ==============================================================================
+# Recommended for most projects. Balances strictness with productivity.
+# Tools: Ruff (lint+format), mypy (strict + Pydantic), pytest (async)
+# Upgrade to: strict.toml for production services
+# ==============================================================================
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my-project"
+version = "1.0.0"
+description = "Project description"
+requires-python = ">=3.14"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=4.1.0",
+]
+
+# ==============================================================================
+# RUFF - Linter & Formatter (replaces black, isort, flake8, pyupgrade)
+# ==============================================================================
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# Standard rule set - catches bugs and enforces best practices
+select = [
+    "E",     # pycodestyle errors
+    "F",     # Pyflakes
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "B",     # flake8-bugbear (common bugs)
+    "C4",    # flake8-comprehensions (better comprehensions)
+    "UP",    # pyupgrade (modern Python syntax)
+    "SIM",   # flake8-simplify (simplify code)
+    "N",     # pep8-naming (naming conventions)
+    "RUF",   # Ruff-specific rules
+]
+
+ignore = [
+    "E501",     # Line too long (handled by formatter)
+    "SIM108",   # Ternary operator (sometimes less readable)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__
+"tests/**/*.py" = ["B", "SIM"]  # Relax for tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "app"]
+combine-as-imports = true
+
+# ==============================================================================
+# MYPY - Static Type Checker
+# ==============================================================================
+[tool.mypy]
+python_version = "3.14"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+show_column_numbers = true
+ignore_missing_imports = true
+
+# Relax for tests
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_any_generics = false
+
+# ==============================================================================
+# PYTEST - Testing Framework
+# ==============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "-ra",
+]
+markers = [
+    "unit: Unit tests (no external dependencies)",
+    "integration: Integration tests (require database)",
+    "slow: Slow running tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# ==============================================================================
+# COVERAGE - Test Coverage
+# ==============================================================================
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+show_missing = true

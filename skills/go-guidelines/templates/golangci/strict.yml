@@ -1,0 +1,115 @@
+# golangci-lint configuration - Strict Tier (DEFAULT)
+# For: Professional projects, most production code
+# Copy to: .golangci.yml in project root
+
+run:
+  timeout: 5m
+  go: "1.22"
+
+linters:
+  disable-all: true
+  enable:
+    # Core linters (from Standard)
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+
+    # Formatting (from Standard)
+    - gofmt
+    - goimports
+
+    # Style (from Standard)
+    - misspell
+    - unconvert
+
+    # Security
+    - gosec         # Security problems
+
+    # Additional quality checks
+    - revive        # Extensible linter
+    - gocritic      # Opinionated linter
+    - prealloc      # Slice preallocation hints
+    - noctx         # HTTP request without context
+    - exhaustive    # Check exhaustiveness of enum switch
+    - errname       # Check error names
+    - nilnil        # Checks for simultaneous nil returns
+    - nilerr        # Finds code returning nil error incorrectly
+    - bodyclose     # Check HTTP response body is closed
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+
+  staticcheck:
+    checks:
+      - "all"
+
+  goimports:
+    local-prefixes: github.com/yourorg
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam  # Can be too strict
+
+  gosec:
+    excludes:
+      - G104  # Audit errors not checked (covered by errcheck)
+
+  exhaustive:
+    default-signifies-exhaustive: true
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 3
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - gocritic
+
+    - path: mock_
+      linters:
+        - revive

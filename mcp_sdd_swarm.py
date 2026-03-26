@@ -121,6 +121,16 @@ class SDDSwarmOrchestrator:
         
         agents_list = ", ".join(available_agents) if available_agents else "None"
         
+        available_skills = []
+        if os.path.exists("skills"):
+            for root, dirs, files in os.walk("skills"):
+                for file in files:
+                    if file.endswith(".md"):
+                        rel_path = os.path.relpath(os.path.join(root, file), "skills")
+                        available_skills.append(rel_path)
+                        
+        skills_list = ", ".join(available_skills) if available_skills else "None"
+        
         system_prompt = ""
         planner_file = "agents/core/planning-agent.md"
         if os.path.exists(planner_file):
@@ -132,6 +142,17 @@ class SDDSwarmOrchestrator:
                         system_prompt = parts[2].strip()
         
         system_prompt = system_prompt.replace("{agents_list}", agents_list)
+        
+        # Inject the skills instructions
+        skill_instruction = f"""
+
+You also have access to the following strictly defined corporate Skills/SOPs located in the `skills/` directory:
+{skills_list}
+
+CRITICAL INSTRUCTION FOR SKILLS:
+If the SPEC.md involves a language or framework that matches a Skill (e.g., they ask for a Python script and you see `python-guidelines/SKILL.md` in the list), you MUST explicitly write a task in your JSON array directing the executing agent to read that exact skill file before they begin coding, so they adhere to our strict corporate standards.
+"""
+        system_prompt += skill_instruction
         
         messages = [
             {"role": "system", "content": system_prompt},
