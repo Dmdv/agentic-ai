@@ -27,7 +27,13 @@ Traditional local backends (LM Studio, Ollama) are CPU-first frameworks retrofit
 
 This infrastructure uses `mlx-lm`. MLX treats macOS Unified Memory as direct arrays. This allows the orchestrator script to instantly load, inference, and dump massive models (via Python garbage collection) with **zero-overhead memory swapping**.
 
-### 2. Multi-Agent Swarm Orchestration (Architect & Engineer)
+### 2. Tier 2 Procedural Memory (The Hive Mind)
+Stateless agents forget everything the moment they shut down. We have integrated **ChromaDB** as a persistent, local Vector Database (`hive_memory.py`). When the `critical-reviewer` agent encounters a complex bug and fixes it, it permanently saves the "Lesson Learned" to the Vector DB. Future swarms automatically retrieve these lessons during the planning phase, meaning your local AI gets permanently smarter the more you use it.
+
+### 3. Reversible Context Compaction
+A massive flaw in traditional single-agent LLM loops is "Context Rot." If an agent executes 10 complex file edits, its context window fills with thousands of lines of terminal logs. We implemented an auto-compaction algorithm in the `MCPAgenticLoop`. If the context history exceeds limits, older, massive tool outputs are physically scrubbed from the `messages` array and replaced with tiny pointers (e.g., `[Prior tool output compacted to prevent context rot]`), preventing memory overflow while preserving logic.
+
+### 4. Multi-Agent Swarm Orchestration (Architect & Engineer)
 We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using a swarm of open-weight MoE models (as of Q1 2026). MoEs are strictly superior for Apple Silicon because they provide the reasoning of massive models while keeping active parameters low, maximizing the Mac's ~800GB/s memory bandwidth.
 
 Our `mcp_swarm_loop.py` script orchestrates two distinct personas:
