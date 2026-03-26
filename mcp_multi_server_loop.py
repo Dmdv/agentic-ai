@@ -90,7 +90,7 @@ If you do not need to use a tool, output your final answer and explanation.
             self.tokenizer = None
             gc.collect()
 
-    def generate_response(self, messages: List[Dict[str, str]]) -> str:
+    async def generate_response(self, messages: List[Dict[str, str]]) -> str:
         self._load_model()
         prompt = self.tokenizer.apply_chat_template(
             messages,
@@ -98,7 +98,9 @@ If you do not need to use a tool, output your final answer and explanation.
             add_generation_prompt=True
         )
         print("\nThinking...")
-        response = generate(
+        # Run generation in a separate thread so it doesn't block the async event loop
+        response = await asyncio.to_thread(
+            generate,
             self.model,
             self.tokenizer,
             prompt=prompt,
@@ -106,6 +108,34 @@ If you do not need to use a tool, output your final answer and explanation.
             verbose=False
         )
         return response
+
+    def _compact_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        Reversible Context Compaction: Prevents the context window from bloating by 
+        scrubbing massive tool outputs from older messages while keeping the system prompt and recent thoughts.
+        """
+        if len(messages) <= 6:
+            return messages
+            
+        compacted = []
+        # Always keep System Prompt and initial User prompt
+        compacted.extend(messages[:2])
+        
+        # Iterate through the middle messages
+        for msg in messages[2:-4]:
+            content = msg.get("content", "")
+            # If a tool result is massively long, replace it with a compaction note
+            if len(content) > 1000 and "Tool '" in content and "' result:" in content:
+                compacted.append({
+                    "role": msg["role"],
+                    "content": f"{content[:100]}...\n[Prior tool output compacted to prevent context rot. Re-read file if specific details are needed.]"
+                })
+            else:
+                compacted.append(msg)
+                
+        # Always keep the 4 most recent messages perfectly intact
+        compacted.extend(messages[-4:])
+        return compacted
 
     def parse_tool_call(self, response: str) -> Optional[Dict[str, Any]]:
         json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
@@ -237,7 +267,10 @@ If you do not need to use a tool, output your final answer and explanation.
         for i in range(max_iterations):
             print(f"\n--- Iteration {i+1} ---")
             
-            response = self.generate_response(messages)
+            # Apply context compaction before generation
+            messages = self._compact_context(messages)
+            
+            response = await self.generate_response(messages)
             print(f"Agent Output:\n{response}")
             messages.append({"role": "assistant", "content": response})
             

@@ -10,6 +10,7 @@ from typing import List, Dict, Any
 from dotenv import load_dotenv
 from mlx_lm import load, generate
 from mcp_multi_server_loop import MCPAgenticLoop
+from hive_memory import HiveMemory
 
 # Load environment variables (e.g. HF_TOKEN) from .env file
 load_dotenv()
@@ -24,6 +25,9 @@ class SDDSwarmOrchestrator:
         self._architect_tokenizer = None
         
         self._engineer_agent = None
+        
+        # Initialize Tier 2 Procedural Memory (Vector DB)
+        self.hive_mind = HiveMemory()
 
     def _get_architect(self):
         if self._architect is None:
@@ -42,10 +46,15 @@ class SDDSwarmOrchestrator:
         print(f"\n=== PHASE 1: SPECIFICATION DRIVEN DEVELOPMENT ===")
         engineer = self._get_engineer_agent()
         
+        # 0. Query Procedural Memory
+        print("\n[SWARM] Querying Hive Mind for related past lessons...")
+        past_lessons = self.hive_mind.get_relevant_lessons(user_prompt)
+        memory_context = f"\n\n### Prior Lessons Learned from Hive Mind:\n{past_lessons}\n(Incorporate these strictly into the spec if applicable.)" if past_lessons else ""
+        
         # 1. Spec Writer generates initial spec
         print(f"\n[SWARM] Generating Initial Specification...")
         engineer.set_persona("agents/core/spec-writer.md")
-        spec_prompt = f"User Request: {user_prompt}\n\nPlease generate a comprehensive specification and save it to SPEC.md."
+        spec_prompt = f"User Request: {user_prompt}{memory_context}\n\nPlease generate a comprehensive specification and save it to SPEC.md."
         await engineer.run(user_prompt=spec_prompt)
         
         # 2. Evaluation Loop
@@ -210,7 +219,16 @@ class SDDSwarmOrchestrator:
             await engineer.run(user_prompt=f"Validate that the recent code changes fulfill this task: '{task}' and align with SPEC.md. Save your findings to VALIDATION.md")
             
             engineer.set_persona("agents/core/critical-reviewer.md")
-            await engineer.run(user_prompt=f"Read VALIDATION.md and review the latest code changes. If there are issues, use bash to fix them, or leave instructions. Save final status to REVIEW_REPORT.md.")
+            await engineer.run(user_prompt=f"Read VALIDATION.md and review the latest code changes. If there are issues, use bash to fix them, or leave instructions. Save final status to REVIEW_REPORT.md. Finally, write a 1-sentence 'Lesson Learned' about any bugs you fixed to LESSONS.txt.")
+            
+            # 3. Procedural Memory Extraction (Hive Mind)
+            if os.path.exists("LESSONS.txt"):
+                with open("LESSONS.txt", "r") as f:
+                    lesson = f.read().strip()
+                if lesson:
+                    print(f"\n[HIVE MIND] Storing Lesson: {lesson}")
+                    self.hive_mind.add_lesson(task, lesson)
+                    report_lines.append(f"- **Lesson Learned:** {lesson}")
             
             report_lines.append(f"- **Validation & Review:** Passed")
             
