@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from mlx_lm import load, generate
 
 class AgenticLoop:
-    def __init__(self, model_name: str = "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit"):
+    def __init__(self, model_name: str = "mlx-community/Qwen3-235B-8bit"):
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
