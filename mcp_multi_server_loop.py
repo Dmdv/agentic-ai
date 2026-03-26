@@ -109,33 +109,61 @@ If you do not need to use a tool, output your final answer and explanation.
         )
         return response
 
-    def _compact_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    async def _compact_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """
-        Reversible Context Compaction: Prevents the context window from bloating by 
-        scrubbing massive tool outputs from older messages while keeping the system prompt and recent thoughts.
+        Multi-Dimensional Context Compaction: Prevents context rot by asking the LLM 
+        to semantically summarize the older history into a dense state object.
         """
-        if len(messages) <= 6:
+        # Only compact if the history gets too long (e.g., > 8 messages)
+        if len(messages) <= 8:
             return messages
             
-        compacted = []
-        # Always keep System Prompt and initial User prompt
-        compacted.extend(messages[:2])
+        print("\n[SYSTEM] Context window threshold reached. Initiating Multi-Dimensional Compaction...")
         
-        # Iterate through the middle messages
-        for msg in messages[2:-4]:
-            content = msg.get("content", "")
-            # If a tool result is massively long, replace it with a compaction note
-            if len(content) > 1000 and "Tool '" in content and "' result:" in content:
-                compacted.append({
-                    "role": msg["role"],
-                    "content": f"{content[:100]}...\n[Prior tool output compacted to prevent context rot. Re-read file if specific details are needed.]"
-                })
-            else:
-                compacted.append(msg)
-                
-        # Always keep the 4 most recent messages perfectly intact
-        compacted.extend(messages[-4:])
-        return compacted
+        # We preserve the System Prompt and the initial User Prompt (indices 0 and 1)
+        # We preserve the 4 most recent messages (recent context)
+        # We compact everything in the middle.
+        core_messages = messages[:2]
+        recent_messages = messages[-4:]
+        messages_to_compact = messages[2:-4]
+        
+        # Convert the middle messages into a string payload
+        history_text = ""
+        for msg in messages_to_compact:
+            history_text += f"\n--- {msg['role'].upper()} ---\n{msg['content']}"
+            
+        compaction_prompt = f"""You are a Context Compaction Agent.
+Analyze the following execution history and summarize it into a strict JSON object to preserve the critical state for the next agent.
+Your JSON must have the following keys:
+- "completed_actions": A list of strings describing what was actually done (e.g., "Wrote 45 lines to auth.py").
+- "active_system_state": A list of strings describing current reality (e.g., "Postgres running on port 5432").
+- "unresolved_threads": A list of strings detailing what still needs to be done or what errors are pending.
+- "key_decisions": A list of strings explaining why certain choices were made.
+
+History to compact:
+{history_text}
+
+Output ONLY the JSON block wrapped in ```json ... ``` tags."""
+
+        compaction_messages = [{"role": "user", "content": compaction_prompt}]
+        summary_response = await self.generate_response(compaction_messages)
+        
+        # Extract the JSON summary
+        json_match = re.search(r'```json\s*(.*?)\s*```', summary_response, re.DOTALL | re.IGNORECASE)
+        if json_match:
+            summary_content = json_match.group(1).strip()
+        else:
+            summary_content = summary_response # Fallback
+            
+        compacted_message = {
+            "role": "assistant",
+            "content": f"[SYSTEM: CONTEXT COMPACTED]\nPrevious steps have been summarized to preserve memory:\n```json\n{summary_content}\n```"
+        }
+        
+        # Rebuild the message history: Core -> Summary -> Recent
+        new_messages = core_messages + [compacted_message] + recent_messages
+        print("[SYSTEM] Compaction complete. Context pristine.")
+        return new_messages
 
     def parse_tool_call(self, response: str) -> Optional[Dict[str, Any]]:
         json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
@@ -268,7 +296,7 @@ If you do not need to use a tool, output your final answer and explanation.
             print(f"\n--- Iteration {i+1} ---")
             
             # Apply context compaction before generation
-            messages = self._compact_context(messages)
+            messages = await self._compact_context(messages)
             
             response = await self.generate_response(messages)
             print(f"Agent Output:\n{response}")

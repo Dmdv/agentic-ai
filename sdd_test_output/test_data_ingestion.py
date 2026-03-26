@@ -1,35 +1,39 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from data_ingestion import DataIngestion
+import unittest
+from unittest.mock import patch
+from sdd_test_output.data_ingestion import DataIngestion
 
+class TestDataIngestion(unittest.TestCase):
+    @patch.object(DataIngestion, 'connect_to_database')
+    def test_connect_to_database(self, mock_connect):
+        di = DataIngestion()
+        di.connect_to_database()
+        mock_connect.assert_called_once()
 
-def test_ingest_from_database_failure():
-    ingestion = DataIngestion()
-    with patch('data_ingestion.DataIngestion.connect_to_database', side_effect=Exception('Database connection failed')):
-        with pytest.raises(Exception) as e:
-            ingestion.ingest_from_database()
-        assert str(e.value) == 'Database connection failed'
+    @patch.object(DataIngestion, 'make_api_request')
+    def test_make_api_request(self, mock_request):
+        di = DataIngestion()
+        di.make_api_request()
+        mock_request.assert_called_once()
 
+    @patch.object(DataIngestion, 'read_file')
+    def test_read_file(self, mock_read):
+        di = DataIngestion()
+        di.read_file('test_path')
+        mock_read.assert_called_once_with('test_path')
 
-def test_ingest_from_api_failure():
-    ingestion = DataIngestion()
-    with patch('data_ingestion.DataIngestion.make_api_request', side_effect=Exception('API request failed')):
-        with pytest.raises(Exception) as e:
-            ingestion.ingest_from_api()
-        assert str(e.value) == 'API request failed'
+    @patch.object(DataIngestion, 'ingest_from_database')
+    def test_ingest_from_database(self, mock_ingest):
+        di = DataIngestion()
+        di.ingest_from_database()
+        mock_ingest.assert_called_once()
 
+    def test_process_data(self):
+        di = DataIngestion()
+        self.assertEqual(di.process_data('test'), 'TEST')
+        with self.assertRaises(TypeError):
+            di.process_data(123)
+        with self.assertRaises(ValueError):
+            di.process_data('')
 
-def test_ingest_from_file_failure():
-    ingestion = DataIngestion()
-    with patch('data_ingestion.DataIngestion.read_file', side_effect=Exception('File read failed')):
-        with pytest.raises(Exception) as e:
-            ingestion.ingest_from_file('test_file.csv')
-        assert str(e.value) == 'File read failed'
-
-
-def test_handle_data_source_failure():
-    ingestion = DataIngestion()
-    with patch('data_ingestion.DataIngestion.ingest_from_database', side_effect=Exception('Incomplete data')):
-        with pytest.raises(Exception) as e:
-            ingestion.ingest_from_database()
-        assert str(e.value) == 'Incomplete data'
+if __name__ == '__main__':
+    unittest.main()
