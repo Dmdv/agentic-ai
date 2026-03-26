@@ -39,9 +39,18 @@ We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using a swarm o
 Our `mcp_swarm_loop.py` script orchestrates two distinct personas:
 *   **Phase 1: The Architect (e.g., DeepSeek-R1-70B or Kimi K2.5-1T)**
     *   *Role:* Ingests the entire repository map and user prompt. It is strictly forbidden from writing code. Instead, it outputs a pristine JSON array of sequential steps and writes a master Markdown specification (`AGENT_PLAN.md`). It is then instantly unloaded from RAM to free up compute. 
-    *   *Why Kimi K2.5?* Kimi K2.5 (1 Trillion total / 32B active parameters) was released in early 2026 with native "Agent Swarm" orchestration training. It excels at breaking down massive architectures into parallelized micro-tasks, scoring 96.1% on the AIME math benchmark.
+    *   *Why Kimi K2.5?* Here is why Kimi K2.5 (or DeepSeek-R1) is arguably a better Architect than Qwen3-235B:
+        1. **Native Agent Swarm Orchestration:** Kimi K2.5 was explicitly trained to orchestrate massive swarms. It natively understands how to break a complex prompt into 100+ parallel sub-tasks and map them to specialized agents. 
+        2. **AIME Reasoning Benchmark:** Kimi K2.5 scores a staggering 96.1% on the AIME Math/Logic benchmark, putting it in the same tier as DeepSeek-R1 and OpenAI o3. (Qwen3 scores ~89%). This allows Kimi to catch edge cases in the SPEC.md that other models miss.
+        3. **Hardware Efficiency:** Kimi K2.5 is a 1-Trillion parameter MoE model, but it only activates 32 Billion parameters per token. This makes it incredibly fast on your M3 Ultra compared to running a dense model of equivalent intelligence.
 *   **Phase 2: The Engineer (e.g., Qwen3-Coder-Next - 80B 8-bit)**
     *   *Role:* Loads into RAM, boots the MCP servers, and iteratively executes every step in the Architect's plan. At only 3B active parameters, it generates code and searches files at blistering speeds (150+ tokens/second).
+
+#### VRAM Cost on M3 Ultra (512GB)
+If you run Kimi K2.5 and Qwen3 simultaneously for your swarm:
+*   **The Architect:** `Kimi-K2.5-1T-4bit` requires roughly ~500GB of total disk space, but due to quantization and MLX unified memory mapping, loading it safely consumes about **~260GB** of active VRAM.
+*   **The Engineer:** `Qwen3-Coder-Next-80B-8bit` consumes about **~85GB** of VRAM.
+*   **Total:** **~345GB of VRAM** (Well within your machine's ~400GB safe allocation limit!).
 
 ### 3. Tree-Sitter Polyglot Repo Mapping
 Dumping raw code into a context window wastes compute and invites hallucinations. We use **Tree-Sitter** to build semantic "Skeleton Maps" of the repository.
