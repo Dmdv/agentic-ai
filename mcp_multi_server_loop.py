@@ -97,16 +97,26 @@ If you do not need to use a tool, output your final answer and explanation.
             tokenize=False,
             add_generation_prompt=True
         )
-        print("\nThinking...")
+        print("\nModel is generating (This may take longer if using a Thinking model)...")
         # Run generation in a separate thread so it doesn't block the async event loop
+        # We increase max_tokens to 8000 because Thinking models use thousands of tokens for internal logic
         response = await asyncio.to_thread(
             generate,
             self.model,
             self.tokenizer,
             prompt=prompt,
-            max_tokens=2000,
+            max_tokens=8000,
             verbose=False
         )
+        
+        # Intercept and strip <think> blocks (DeepSeek-R1 / QwQ format)
+        think_match = re.search(r'<think>(.*?)</think>', response, re.DOTALL | re.IGNORECASE)
+        if think_match:
+            think_content = think_match.group(1).strip()
+            print(f"[SYSTEM] Model generated {len(think_content.split())} words of internal thought process.")
+            # Remove the think block from the final returned response
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE).strip()
+            
         return response
 
     async def _compact_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
