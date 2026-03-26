@@ -13,15 +13,17 @@ CRITICAL INSTRUCTIONS:
 3. Output a JSON array of exact execution steps for the Engineering Swarm.
 4. Crucially, for each step, you must select the best specialized agent from the available agents list to execute it.
 5. You MUST inject testing and validation steps after every major code modification.
+6. **Parallel Execution (Stages):** Assign a numeric `stage` to each task. Tasks with the same `stage` number will be executed concurrently by the Swarm. Only group tasks into the same stage if they are completely independent (e.g., writing frontend CSS vs writing backend SQL). If a task depends on the completion of another, it must be assigned a higher `stage` number.
 
 Available Specialized Agents in `agents/` directory: {agents_list}
 
 Example Output:
 ```json
 [
-  {"task": "Write failing tests for the auth service as per SPEC.md", "agent": "qa/test-fixer.md"},
-  {"task": "Implement the auth service in src/auth.py", "agent": "core/default-engineer.md"},
-  {"task": "Run tests and verify the implementation matches SPEC.md", "agent": "qa/requirement-validator.md"}
+  {"stage": 1, "task": "Write failing tests for the auth service as per SPEC.md", "agent": "qa/test-fixer.md"},
+  {"stage": 2, "task": "Implement the auth service in src/auth.py", "agent": "core/default-engineer.md"},
+  {"stage": 2, "task": "Implement the auth UI in src/Login.jsx", "agent": "frontend/react-engineer.md"},
+  {"stage": 3, "task": "Run tests and verify the implementation matches SPEC.md", "agent": "qa/requirement-validator.md"}
 ]
 ```
 
