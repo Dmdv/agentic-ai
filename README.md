@@ -37,8 +37,9 @@ A massive flaw in traditional single-agent LLM loops is "Context Rot." If an age
 We implement a "System 2 (Thinking)" and "System 1 (Doing)" loop using a swarm of open-weight MoE models (as of Q1 2026). MoEs are strictly superior for Apple Silicon because they provide the reasoning of massive models while keeping active parameters low, maximizing the Mac's ~800GB/s memory bandwidth.
 
 Our `mcp_swarm_loop.py` script orchestrates two distinct personas:
-*   **Phase 1: The Architect (e.g., Qwen3-235B - 8-bit)**
-    *   *Role:* Ingests the entire repository map and user prompt. It is strictly forbidden from writing code. Instead, it outputs a pristine JSON array of sequential steps and writes a master Markdown specification (`AGENT_PLAN.md`). It is then instantly unloaded from RAM to free up compute.
+*   **Phase 1: The Architect (e.g., DeepSeek-R1-70B or Kimi K2.5-1T)**
+    *   *Role:* Ingests the entire repository map and user prompt. It is strictly forbidden from writing code. Instead, it outputs a pristine JSON array of sequential steps and writes a master Markdown specification (`AGENT_PLAN.md`). It is then instantly unloaded from RAM to free up compute. 
+    *   *Why Kimi K2.5?* Kimi K2.5 (1 Trillion total / 32B active parameters) was released in early 2026 with native "Agent Swarm" orchestration training. It excels at breaking down massive architectures into parallelized micro-tasks, scoring 96.1% on the AIME math benchmark.
 *   **Phase 2: The Engineer (e.g., Qwen3-Coder-Next - 80B 8-bit)**
     *   *Role:* Loads into RAM, boots the MCP servers, and iteratively executes every step in the Architect's plan. At only 3B active parameters, it generates code and searches files at blistering speeds (150+ tokens/second).
 
