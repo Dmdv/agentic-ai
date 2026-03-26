@@ -165,9 +165,70 @@ class SDDSwarmOrchestrator:
             print(f"Failed to parse Planner JSON output: {e}\nRaw output: {response}")
             return [{"task": "Implement SPEC.md", "agent": None}]
 
-    async def _run_execution_phase(self, steps: List[Dict[str, str]]):
-        print(f"\n=== PHASE 3: ISOLATED EXECUTION & VALIDATION ===")
-        engineer = self._get_engineer_agent()
+    async def _execute_single_task(self, task_info: Dict[str, Any], preloaded_model, preloaded_tokenizer, step_num: int) -> str:
+        task = task_info.get("task", "")
+        agent_file = task_info.get("agent")
+        
+        engineer = MCPAgenticLoop(
+            model_name=self.engineer_model_name, 
+            keep_in_memory=True, 
+            preloaded_model=preloaded_model, 
+            preloaded_tokenizer=preloaded_tokenizer
+        )
+        
+        found_persona_path = None
+        if agent_file:
+            exact_path = os.path.join("agents", agent_file)
+            if os.path.exists(exact_path):
+                found_persona_path = exact_path
+            else:
+                for root, dirs, files in os.walk("agents"):
+                    if os.path.basename(agent_file) in files:
+                        found_persona_path = os.path.join(root, os.path.basename(agent_file))
+                        break
+                        
+        if found_persona_path:
+            print(f"\n=== SWARM HOT-SWAP [Step {step_num}]: Loading '{found_persona_path}' Persona ===")
+            engineer.set_persona(found_persona_path)
+        else:
+            engineer.set_persona(None)
+            
+        print(f"\n=== EXECUTING TASK [Step {step_num}]: {task} ===")
+        await engineer.run(user_prompt=task)
+        
+        # Validation & Review Loop
+        print(f"\n=== VALIDATING TASK [Step {step_num}]: {task} ===")
+        engineer.set_persona("agents/qa/requirement-validator.md")
+        await engineer.run(user_prompt=f"Validate that the recent code changes fulfill this task: '{task}' and align with SPEC.md. Save your findings to VALIDATION_{step_num}.md")
+        
+        engineer.set_persona("agents/core/critical-reviewer.md")
+        await engineer.run(user_prompt=f"Read VALIDATION_{step_num}.md and review the latest code changes. If there are issues, use bash to fix them, or leave instructions. Save final status to REVIEW_REPORT_{step_num}.md. Finally, write a 1-sentence 'Lesson Learned' about any bugs you fixed to LESSONS_{step_num}.txt.")
+        
+        lesson = ""
+        if os.path.exists(f"LESSONS_{step_num}.txt"):
+            with open(f"LESSONS_{step_num}.txt", "r") as f:
+                lesson = f.read().strip()
+            if lesson:
+                print(f"\n[HIVE MIND] Storing Lesson: {lesson}")
+                self.hive_mind.add_lesson(task, lesson)
+                
+        return lesson
+
+    async def _run_execution_phase(self, steps: List[Dict[str, Any]]):
+        print(f"\n=== PHASE 3: PARALLEL EXECUTION & VALIDATION ===")
+        
+        # Group steps by stage
+        stages = {}
+        for i, step in enumerate(steps):
+            stage_num = step.get("stage", i) # Default to sequential if no stage provided
+            if stage_num not in stages:
+                stages[stage_num] = []
+            stages[stage_num].append((i + 1, step))
+            
+        # Ensure the engineer model is loaded into RAM once
+        base_engineer = self._get_engineer_agent()
+        preloaded_model = base_engineer.model
+        preloaded_tokenizer = base_engineer.tokenizer
         
         import datetime
         report_lines = [
@@ -179,58 +240,33 @@ class SDDSwarmOrchestrator:
         for i, step in enumerate(steps):
             task = step.get("task", "")
             agent = step.get("agent", "Default Engineer")
-            report_lines.append(f"{i+1}. **Agent:** `{agent}` -> **Task:** {task}")
+            stage = step.get("stage", "None")
+            report_lines.append(f"{i+1}. **Stage:** {stage} | **Agent:** `{agent}` -> **Task:** {task}")
             
         report_lines.append("\n## Engineering Phase")
         
-        for i, step in enumerate(steps):
-            task = step.get("task", "")
-            agent_file = step.get("agent")
+        # Execute stages sequentially, but tasks within a stage concurrently
+        for stage_num in sorted(stages.keys()):
+            stage_tasks = stages[stage_num]
+            print(f"\n>>> STARTING STAGE {stage_num} ({len(stage_tasks)} concurrent tasks) <<<")
             
-            report_lines.append(f"\n### Step {i+1}: {task}")
-            
-            # 1. Execution
-            found_persona_path = None
-            if agent_file:
-                exact_path = os.path.join("agents", agent_file)
-                if os.path.exists(exact_path):
-                    found_persona_path = exact_path
-                else:
-                    for root, dirs, files in os.walk("agents"):
-                        if os.path.basename(agent_file) in files:
-                            found_persona_path = os.path.join(root, os.path.basename(agent_file))
-                            break
-                            
-            if found_persona_path:
-                print(f"\n=== SWARM HOT-SWAP: Loading '{found_persona_path}' Persona ===")
-                report_lines.append(f"- **Executor Persona:** `{found_persona_path}`")
-                engineer.set_persona(found_persona_path)
-            else:
-                engineer.set_persona(None)
+            coroutines = []
+            for step_num, step_info in stage_tasks:
+                report_lines.append(f"\n### Step {step_num} (Stage {stage_num}): {step_info.get('task')}")
+                report_lines.append(f"- **Executor Persona:** `{step_info.get('agent', 'Default')}`")
                 
-            print(f"\n=== EXECUTING TASK: {task} ===")
-            await engineer.run(user_prompt=task)
-            report_lines.append(f"- **Execution:** Done")
+                coro = self._execute_single_task(step_info, preloaded_model, preloaded_tokenizer, step_num)
+                coroutines.append(coro)
+                
+            # Run all tasks in this stage concurrently
+            results = await asyncio.gather(*coroutines, return_exceptions=True)
             
-            # 2. Validation & Review Loop
-            print(f"\n=== VALIDATING TASK: {task} ===")
-            
-            engineer.set_persona("agents/qa/requirement-validator.md")
-            await engineer.run(user_prompt=f"Validate that the recent code changes fulfill this task: '{task}' and align with SPEC.md. Save your findings to VALIDATION.md")
-            
-            engineer.set_persona("agents/core/critical-reviewer.md")
-            await engineer.run(user_prompt=f"Read VALIDATION.md and review the latest code changes. If there are issues, use bash to fix them, or leave instructions. Save final status to REVIEW_REPORT.md. Finally, write a 1-sentence 'Lesson Learned' about any bugs you fixed to LESSONS.txt.")
-            
-            # 3. Procedural Memory Extraction (Hive Mind)
-            if os.path.exists("LESSONS.txt"):
-                with open("LESSONS.txt", "r") as f:
-                    lesson = f.read().strip()
-                if lesson:
-                    print(f"\n[HIVE MIND] Storing Lesson: {lesson}")
-                    self.hive_mind.add_lesson(task, lesson)
+            for (step_num, _), lesson in zip(stage_tasks, results):
+                report_lines.append(f"- **Execution & Validation:** Passed")
+                if isinstance(lesson, str) and lesson:
                     report_lines.append(f"- **Lesson Learned:** {lesson}")
-            
-            report_lines.append(f"- **Validation & Review:** Passed")
+                elif isinstance(lesson, Exception):
+                    report_lines.append(f"- **Error:** {str(lesson)}")
             
         print("\n=== SWARM EXECUTION COMPLETE ===")
         report_lines.append("\n## Swarm Execution Complete")

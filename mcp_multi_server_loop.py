@@ -16,17 +16,17 @@ from mcp.client.session import ClientSession
 load_dotenv()
 
 class MCPAgenticLoop:
-    def __init__(self, model_name: str = "mlx-community/Qwen3-Coder-Next-80B-8bit", keep_in_memory: bool = False, persona_file: str = None):
+    def __init__(self, model_name: str = "mlx-community/Qwen3-235B-8bit", keep_in_memory: bool = False, persona_file: str = None, preloaded_model=None, preloaded_tokenizer=None):
         self.model_name = model_name
-        self.model = None
-        self.tokenizer = None
+        self.model = preloaded_model
+        self.tokenizer = preloaded_tokenizer
         self.keep_in_memory = keep_in_memory
-        
+
         # Dictionary to store sessions for multiple servers
         self.sessions = {}
         self.available_tools = {}
         self.allowed_tool_names = None
-        
+
         self.set_persona(persona_file)
 
     def set_persona(self, persona_file: str = None):
@@ -206,6 +206,14 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
 
     def _format_tools(self) -> str:
         descriptions = []
+        
+        # Add the native orchestrator tools
+        descriptions.append("""
+--- Tools from Orchestrator ---
+- **create_mcp_server**: Dynamically write and boot a custom Python MCP server to expand your own capabilities. Provide 'server_name' and the 'python_code'. The orchestrator will save it to disk, boot it, and inject its new tools into your context.
+  Schema: {"type": "object", "properties": {"server_name": {"type": "string"}, "python_code": {"type": "string"}}, "required": ["server_name", "python_code"]}
+""")
+        
         for server_name, tools in self.available_tools.items():
             server_has_tools = False
             server_tools_str = [f"\n--- Tools from {server_name} ---"]
@@ -223,6 +231,7 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
 
     async def setup_mcp_servers(self):
         """Initializes all required MCP servers."""
+        import os
         allowed_dir = os.path.abspath(".")
         db_path = os.path.join(allowed_dir, "agent.db")
         
@@ -261,6 +270,18 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
             command="python3",
             args=["mcp_server_bash.py"],
         )
+        
+        # 7. Surgical Diff Server (Python) - For Aider-style file editing
+        diff_params = StdioServerParameters(
+            command="python3",
+            args=["mcp_server_diff.py"],
+        )
+        
+        # 8. Vision Server (Python) - For multimodal UI validation
+        vision_params = StdioServerParameters(
+            command="python3",
+            args=["mcp_server_vision.py"],
+        )
 
         servers = {
             "Filesystem": fs_params,
@@ -268,12 +289,42 @@ Output ONLY the JSON block wrapped in ```json ... ``` tags."""
             "SQLite": sqlite_params,
             "Fetch": fetch_params,
             "Memory": memory_params,
-            "Bash": bash_params
+            "Bash": bash_params,
+            "Diff": diff_params,
+            "Vision": vision_params
         }
 
         self.server_configs = servers
 
     async def execute_tool_call(self, tool_name: str, tool_kwargs: dict) -> str:
+        if tool_name == "create_mcp_server":
+            server_name = tool_kwargs.get("server_name", "custom_server")
+            code = tool_kwargs.get("python_code", "")
+            file_name = f"mcp_custom_{server_name}.py"
+            
+            with open(file_name, "w") as f:
+                f.write(code)
+                
+            params = StdioServerParameters(command="python3", args=[file_name])
+            self.server_configs[server_name] = params
+            
+            # Briefly connect to discover tools
+            try:
+                async with stdio_client(params) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        tools_response = await session.list_tools()
+                        self.available_tools[server_name] = tools_response.tools
+                        new_tools = [t.name for t in tools_response.tools]
+                        
+                        # If we have a whitelist, we must auto-whitelist the new tools so the agent can use them
+                        if self.allowed_tool_names is not None:
+                            self.allowed_tool_names.extend(new_tools)
+                            
+                        return f"Successfully created and booted '{server_name}'. New tools added to your context: {new_tools}"
+            except Exception as e:
+                return f"Failed to boot the custom server. Syntax or connection error: {e}"
+
         target_server_name = None
         
         for server_name, tools in self.available_tools.items():
