@@ -39,7 +39,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test Apple MLX with Qwen/Kimi models.")
     # Defaulting to a very capable but manageable 32B model for testing. 
     # You can pass the 80B Qwen3 or 1T Kimi models here once you are ready for the massive downloads.
-    parser.add_argument("--model", type=str, default="mlx-community/Qwen2.5-Coder-32B-Instruct-4bit",
+    parser.add_argument("--model", type=str, default="mlx-community/Qwen3-235B-8bit",
                         help="HuggingFace model ID (must be an MLX format model).")
     parser.add_argument("--prompt", type=str, default="Write a Python function to compute the Fibonacci sequence, and explain its time complexity.",
                         help="The prompt to send to the model.")
