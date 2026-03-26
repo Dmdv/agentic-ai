@@ -260,7 +260,7 @@ class SDDSwarmOrchestrator:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Spec-Driven Development Multi-Agent Swarm.")
     parser.add_argument("--prompt", type=str, required=True, help="The overall task to build.")
-    parser.add_argument("--architect", type=str, default="mlx-community/DeepSeek-R1-Distill-Llama-70B-8bit", help="The planning model.")
+    parser.add_argument("--architect", type=str, default="mlx-community/Kimi-K2.5-1T-4bit", help="The planning model.")
     parser.add_argument("--engineer", type=str, default="mlx-community/Qwen3-235B-8bit", help="The executing model.")
     
     args = parser.parse_args()
