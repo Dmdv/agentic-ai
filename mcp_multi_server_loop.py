@@ -114,12 +114,29 @@ If you do not need to use a tool, output your final answer and explanation.
         Multi-Dimensional Context Compaction: Prevents context rot by asking the LLM 
         to semantically summarize the older history into a dense state object.
         """
-        # Only compact if the history gets too long.
-        # Increased to 20 to take advantage of Qwen3's massive 128k context window.
-        if len(messages) <= 20:
+        # Ensure the model and tokenizer are loaded before we can count tokens
+        self._load_model()
+        
+        # 1. Deterministic Token Counting
+        # Convert the current message array into the exact string the LLM will see
+        prompt_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
+        
+        # Encode the string to get the exact token count
+        # Note: Depending on the huggingface tokenizer version, encode() returns a list of integers
+        token_ids = self.tokenizer.encode(prompt_string)
+        current_token_count = len(token_ids)
+        
+        # Qwen3-80B has a 128k context window. We trigger compaction at 100k 
+        # to leave plenty of room for the prompt and the generation output.
+        MAX_CONTEXT_TOKENS = 100_000
+        
+        if current_token_count <= MAX_CONTEXT_TOKENS:
+            # We are safe. No compaction needed.
+            # (Optional: Print a debug statement if you want to track context growth)
+            # print(f"[DEBUG] Current Context Size: {current_token_count}/{MAX_CONTEXT_TOKENS} tokens")
             return messages
             
-        print("\n[SYSTEM] Context window threshold reached. Initiating Multi-Dimensional Compaction...")
+        print(f"\n[SYSTEM] Context window critical ({current_token_count} tokens). Initiating Multi-Dimensional Compaction...")
         
         # We preserve the System Prompt and the initial User Prompt (indices 0 and 1)
         # We preserve the 4 most recent messages (recent context)
