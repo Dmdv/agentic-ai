@@ -165,20 +165,27 @@ If you do not need to use a tool, output your final answer and explanation.
         history_text = ""
         for msg in messages_to_compact:
             history_text += f"\n--- {msg['role'].upper()} ---\n{msg['content']}"
-            
+
+        # SAFETY CHECK: If the history_text is massive (e.g., a wildcard search returned 300k tokens),
+        # we cannot feed it to the LLM to summarize, because the summarization prompt will exceed
+        # the context window and crash the MLX Metal backend (Abort trap: 6 / OOM).
+        # We enforce a hard limit of ~40,000 characters for the summary block to ensure it fits safely.
+        if len(history_text) > 40000:
+            print("[SYSTEM] Warning: History exceeds summarization capacity. Hard-truncating before compaction.")
+            history_text = history_text[-40000:] + "\n...[EARLIER HISTORY HARD-TRUNCATED DUE TO EXTREME LENGTH]"
+
         compaction_prompt = f"""You are a Context Compaction Agent.
-Analyze the following execution history and summarize it into a strict JSON object to preserve the critical state for the next agent.
-Your JSON must have the following keys:
-- "completed_actions": A list of strings describing what was actually done (e.g., "Wrote 45 lines to auth.py").
-- "active_system_state": A list of strings describing current reality (e.g., "Postgres running on port 5432").
-- "unresolved_threads": A list of strings detailing what still needs to be done or what errors are pending.
-- "key_decisions": A list of strings explaining why certain choices were made.
+        Analyze the following execution history and summarize it into a strict JSON object to preserve the critical state for the next agent.
+        Your JSON must have the following keys:
+        - "completed_actions": A list of strings describing what was actually done (e.g., "Wrote 45 lines to auth.py").
+        - "active_system_state": A list of strings describing current reality (e.g., "Postgres running on port 5432").
+        - "unresolved_threads": A list of strings detailing what still needs to be done or what errors are pending.
+        - "key_decisions": A list of strings explaining why certain choices were made.
 
-History to compact:
-{history_text}
+        History to compact:
+        {history_text}
 
-Output ONLY the JSON block wrapped in ```json ... ``` tags."""
-
+        Output ONLY the JSON block wrapped in ```json ... ``` tags."""
         compaction_messages = [{"role": "user", "content": compaction_prompt}]
         summary_response = await self.generate_response(compaction_messages)
         
