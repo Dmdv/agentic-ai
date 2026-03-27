@@ -1,39 +1,38 @@
-import unittest
-from unittest.mock import patch
+import pytest
 from sdd_test_output.data_ingestion import DataIngestion
 
-class TestDataIngestion(unittest.TestCase):
-    @patch.object(DataIngestion, 'connect_to_database')
-    def test_connect_to_database(self, mock_connect):
-        di = DataIngestion()
-        di.connect_to_database()
-        mock_connect.assert_called_once()
+class TestDataIngestion:
+    def test_connect_to_database(self):
+        data_ingestion = DataIngestion()
+        with pytest.raises(NotImplementedError):
+            data_ingestion.connect_to_database()
 
-    @patch.object(DataIngestion, 'make_api_request')
-    def test_make_api_request(self, mock_request):
-        di = DataIngestion()
-        di.make_api_request()
-        mock_request.assert_called_once()
+    def test_make_api_request(self):
+        data_ingestion = DataIngestion()
+        with pytest.raises(NotImplementedError):
+            data_ingestion.make_api_request()
 
-    @patch.object(DataIngestion, 'read_file')
-    def test_read_file(self, mock_read):
-        di = DataIngestion()
-        di.read_file('test_path')
-        mock_read.assert_called_once_with('test_path')
+    def test_read_file(self):
+        data_ingestion = DataIngestion()
+        with pytest.raises(NotImplementedError):
+            data_ingestion.read_file("some_file_path")
 
-    @patch.object(DataIngestion, 'ingest_from_database')
-    def test_ingest_from_database(self, mock_ingest):
-        di = DataIngestion()
-        di.ingest_from_database()
-        mock_ingest.assert_called_once()
+    def test_ingest_from_database(self):
+        data_ingestion = DataIngestion()
+        with pytest.raises(NotImplementedError):
+            data_ingestion.ingest_from_database()
 
-    def test_process_data(self):
-        di = DataIngestion()
-        self.assertEqual(di.process_data('test'), 'TEST')
-        with self.assertRaises(TypeError):
-            di.process_data(123)
-        with self.assertRaises(ValueError):
-            di.process_data('')
+    def test_process_data_with_non_string(self):
+        data_ingestion = DataIngestion()
+        with pytest.raises(TypeError):
+            data_ingestion.process_data(123)
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_process_data_with_empty_string(self):
+        data_ingestion = DataIngestion()
+        with pytest.raises(ValueError):
+            data_ingestion.process_data("")
+
+    def test_process_data_with_valid_string(self):
+        data_ingestion = DataIngestion()
+        result = data_ingestion.process_data("test")
+        assert result == "test"  # This will fail

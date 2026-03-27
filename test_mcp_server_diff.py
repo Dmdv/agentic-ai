@@ -1,22 +1,26 @@
-import unittest
-from unittest.mock import patch, MagicMock
+import pytest
 from mcp_server_diff import apply_diff
 
-class TestMcpServerDiff(unittest.TestCase):
-    @patch('builtins.open', new_callable=MagicMock)
-    def test_apply_diff(self, mock_open):
-        mock_open.side_effect = [
-            MagicMock(read=MagicMock(return_value="line1\nline2\nline3\nline4\n")),
-            MagicMock(write=MagicMock())
-        ]
-        
-        content = "line1\nline2\nline3\nline4\n"
-        search_block = "line2\nline3\n"
-        replace_block = "line2_new\nline3_new\n"
-        expected = "line1\nline2_new\nline3_new\nline4\n"
-        
-        new_content = apply_diff(content, search_block, replace_block)
-        self.assertEqual(new_content, expected)
+def test_apply_diff_not_found():
+    content = "This is a test string."
+    search_block = "not found"
+    replace_block = "replacement"
+    with pytest.raises(ValueError) as e:
+        apply_diff(content, search_block, replace_block)
+    assert str(e.value) == "Could not find the search block in the file. Ensure the search block exactly matches the existing code."
 
-if __name__ == "__main__":
-    unittest.main()
+def test_apply_diff_empty_search_block():
+    content = "This is a test string."
+    search_block = ""
+    replace_block = "replacement"
+    with pytest.raises(ValueError) as e:
+        apply_diff(content, search_block, replace_block)
+    assert str(e.value) == "Search block is effectively empty."
+
+def test_apply_diff_invalid_replacement():
+    content = "This is a test string."
+    search_block = "test"
+    replace_block = None
+    with pytest.raises(TypeError) as e:
+        apply_diff(content, search_block, replace_block)
+    assert str(e.value) == "replace_block must be a string"

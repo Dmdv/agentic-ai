@@ -31,19 +31,22 @@ class VisionServer:
             }
         ]
         
-        prompt_text = self.processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        
-        output = generate(
-            self.model,
-            self.processor,
-            prompt_text,
-            max_tokens=1000,
-            verbose=False
-        )
-        
-        return output
+        try:
+            prompt_text = self.processor.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+            
+            output = generate(
+                self.model,
+                self.processor,
+                prompt_text,
+                max_tokens=1000,
+                verbose=False
+            )
+            
+            return output
+        except Exception as e:
+            raise Exception(f'Error processing image: {str(e)}')
 
 vision_server = VisionServer()
 
@@ -57,7 +60,7 @@ def handle_list_tools():
                     "type": "object",
                     "properties": {
                         "image_path": {"type": "string", "description": "Local path or URL to the image."},
-                        "prompt": {"type": "string", "description": "What to look for or validate in the image. e.g. 'Does this UI match a login screen with a blue button?'"}
+                        "prompt": {"type": "string", "description": "What to look for or validate in the image. e.g. 'Does this UI match a login screen with a blue button?"}
                     },
                     "required": ["image_path", "prompt"]
                 }
