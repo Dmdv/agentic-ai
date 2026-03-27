@@ -186,6 +186,34 @@ def get_relevant_lessons(self, prompt: str, n_results=3): ...
 ### mcp_custom_file_writer.py ###
   (No relevant structure defined)
 
+### test_python_skills/pyproject.toml ###
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "B", "T", "A", "Q", "I", "UP", "RUF100"]
+ignore = ["E501", "F401"]
+target-version = "py38"
+
+
+[tool.mypy]
+python_version = "3.8"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+no_strict_optional = true
+show_error_codes = true
+
+
+### test_python_skills/.ruff.toml ###
+  (No relevant structure defined)
+
 ### sdd_test_output/report_generation.py ###
 def generate_report(data, format='pdf'): ...
 
