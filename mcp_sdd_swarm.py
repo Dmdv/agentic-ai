@@ -17,9 +17,10 @@ load_dotenv()
 
 class SDDSwarmOrchestrator:
     """Spec-Driven Development Swarm Orchestrator inspired by Claude Superpowers."""
-    def __init__(self, architect_model: str, engineer_model: str):
+    def __init__(self, architect_model: str, engineer_model: str, working_dir: str = "."):
         self.architect_model_name = architect_model
         self.engineer_model_name = engineer_model
+        self.working_dir = working_dir
         
         self._architect = None
         self._architect_tokenizer = None
@@ -38,7 +39,7 @@ class SDDSwarmOrchestrator:
     def _get_engineer_agent(self):
         if self._engineer_agent is None:
             print(f"\n[SWARM] Loading Engineer ({self.engineer_model_name}) into RAM (Cached)...")
-            self._engineer_agent = MCPAgenticLoop(model_name=self.engineer_model_name, keep_in_memory=True)
+            self._engineer_agent = MCPAgenticLoop(model_name=self.engineer_model_name, keep_in_memory=True, working_dir=self.working_dir)
             self._engineer_agent._load_model()
         return self._engineer_agent
 
@@ -319,9 +320,10 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str, required=True, help="The overall task to build.")
     parser.add_argument("--architect", type=str, default="mlx-community/Kimi-K2.5-1T-4bit", help="The planning model.")
     parser.add_argument("--engineer", type=str, default="mlx-community/Qwen3-235B-8bit", help="The executing model.")
+    parser.add_argument("--dir", type=str, default=".", help="The specific directory to restrict the agent's file operations to.")
     
     args = parser.parse_args()
-    swarm = SDDSwarmOrchestrator(architect_model=args.architect, engineer_model=args.engineer)
+    swarm = SDDSwarmOrchestrator(architect_model=args.architect, engineer_model=args.engineer, working_dir=args.dir)
     
     try:
         asyncio.run(swarm.run(user_prompt=args.prompt))

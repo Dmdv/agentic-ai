@@ -15,9 +15,10 @@ from mcp_multi_server_loop import MCPAgenticLoop
 load_dotenv()
 
 class SwarmOrchestrator:
-    def __init__(self, architect_model: str, engineer_model: str):
+    def __init__(self, architect_model: str, engineer_model: str, working_dir: str = "."):
         self.architect_model_name = architect_model
         self.engineer_model_name = engineer_model
+        self.working_dir = working_dir
         
         # Cache the models in memory so we don't reload from disk
         self._architect = None
@@ -34,7 +35,7 @@ class SwarmOrchestrator:
     def _get_engineer_agent(self):
         if self._engineer_agent is None:
             print(f"\n[SWARM] Loading Engineer ({self.engineer_model_name}) into RAM (Cached)...")
-            self._engineer_agent = MCPAgenticLoop(model_name=self.engineer_model_name, keep_in_memory=True)
+            self._engineer_agent = MCPAgenticLoop(model_name=self.engineer_model_name, keep_in_memory=True, working_dir=self.working_dir)
             # Pre-load the engineer's model so it stays in RAM
             self._engineer_agent._load_model()
         return self._engineer_agent
@@ -241,10 +242,11 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str, required=True, help="The overall task for the Swarm.")
     parser.add_argument("--architect", type=str, default="mlx-community/Kimi-K2.5-1T-4bit", help="The planning model.")
     parser.add_argument("--engineer", type=str, default="mlx-community/Qwen3-235B-8bit", help="The executing model.")
+    parser.add_argument("--dir", type=str, default=".", help="The specific directory to restrict the agent's file operations to.")
     
     args = parser.parse_args()
     
-    swarm = SwarmOrchestrator(architect_model=args.architect, engineer_model=args.engineer)
+    swarm = SwarmOrchestrator(architect_model=args.architect, engineer_model=args.engineer, working_dir=args.dir)
     
     try:
         asyncio.run(swarm.run(user_prompt=args.prompt))
