@@ -69,21 +69,40 @@ Instead of hardcoding custom Python tools, the Engineer model interacts with you
 
 ---
 
-## 📂 Repository Contents
+## 📂 Repository Contents (The Orchestrator Scripts)
 
-### Specifications
-*   `AGENTIC_INFRASTRUCTURE_SPECS_V5_MLX.md`: The final architectural blueprint.
-*   *(V1 - V4 specs are preserved for historical context).*
+You do not need to use all of the Python scripts in this repository. They exist as a historical record of how the architecture evolved from a basic "Proof of Concept" into a massive "Enterprise Swarm".
 
-### The Agents & Tools
-*   `generate_repo_map.py`: The Tree-Sitter script that generates the `.repo_map` context file.
-*   `mcp_server_bash.py`: The custom, secure Bash execution MCP server.
-*   `mcp_multi_server_loop.py`: The base single-model orchestrator (boots all 6 MCP servers).
-*   `mcp_swarm_loop.py`: The advanced Multi-Agent Swarm orchestrator (Architect -> Engineer pipeline).
+### The "Historical" Scripts (Proof of Concepts)
+These scripts were stepping stones to prove the Apple MLX and MCP technology worked before we built the massive swarm. You can ignore these for daily use:
+1. `agentic_loop.py`: The very first script we wrote. It doesn't connect to the real file system. It was just a proof-of-concept to see if the Qwen model was smart enough to output a JSON tool call instead of just chatting.
+2. `mcp_agentic_loop.py`: Our second iteration. It successfully hooked Qwen up to a single MCP Server (the filesystem).
+3. `mcp_multi_server_loop.py`: The third iteration. This proved we could connect the agent to 6 different MCP servers at once (Git, Bash, SQLite, etc.). *This is the foundational engine that powers the Swarms.*
+
+### The "Production" Scripts (The ones you actually use)
+These are the two scripts you will actually use depending on how complex your task is.
+
+#### 1. The Quick Fixer (`mcp_swarm_loop.py`)
+*   **What it is:** The basic Multi-Agent Swarm.
+*   **How it works:** It uses two models (Architect and Engineer). It generates a quick plan and then executes it sequentially.
+*   **When to use it:** Use this for fast, single-domain tasks. It is fast and gets straight to the point without generating massive documentation.
+*   **How to start it:**
+    ```bash
+    python mcp_swarm_loop.py --prompt "Fix the bug on line 45 of auth.py and run the tests."
+    ```
+
+#### 2. The Enterprise Builder (`mcp_sdd_swarm.py`)
+*   **What it is:** The **Spec-Driven Development (SDD)** Swarm. This is the crown jewel of the repository.
+*   **How it works:** It enforces a rigorous 3-phase pipeline. It forces the `spec-writer` to write a huge Markdown document, forces the `researcher` to critique it, pulls your corporate SOPs from the `skills/` directory, and runs the actual coding tasks in parallel.
+*   **When to use it:** Use this when you are building a feature from scratch or doing a massive refactor. You run this script, walk away for 30 minutes, and come back to a fully documented, tested, and containerized project.
+*   **How to start it:**
+    ```bash
+    python mcp_sdd_swarm.py --prompt "Build me a new Python microservice that connects to SQLite and uses JWT auth."
+    ```
 
 ---
 
-## 🚀 Quick Start & Usage Guide
+## 🚀 Quick Start & Setup
 
 ### Prerequisites
 *   Apple Silicon Mac (M-series).
