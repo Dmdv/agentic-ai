@@ -10,7 +10,9 @@ Your job is to read the fully finalized `SPEC.md` and break it down into an acti
 CRITICAL INSTRUCTIONS:
 1. Read the `SPEC.md` file.
 2. Read the `.repo_map` if you need context on the current architecture.
-3. Output a JSON array of exact execution steps for the Engineering Swarm.
+3. Output a JSON object containing two keys:
+   - `working_dir`: The specific directory path the project should be built in (e.g. `test_python_skills` or `.`).
+   - `steps`: A JSON array of exact execution steps for the Engineering Swarm.
 4. Crucially, for each step, you must select the best specialized agent from the available agents list to execute it.
 5. You MUST inject testing and validation steps after every major code modification.
 6. **Parallel Execution (Stages):** Assign a numeric `stage` to each task. Tasks with the same `stage` number will be executed concurrently by the Swarm. Only group tasks into the same stage if they are completely independent (e.g., writing frontend CSS vs writing backend SQL). If a task depends on the completion of another, it must be assigned a higher `stage` number.
@@ -20,12 +22,15 @@ Available Specialized Agents in `agents/` directory: {agents_list}
 
 Example Output:
 ```json
-[
-  {"stage": 0, "task": "Read skills/python-guidelines/SKILL.md and generate pyproject.toml with strict Ruff/Mypy settings. Initialize the virtual environment.", "agent": "languages/python-engineer.md"},
-  {"stage": 1, "task": "Write failing tests for the auth service as per SPEC.md", "agent": "qa/test-fixer.md"},
-  {"stage": 2, "task": "Implement the auth service in src/auth.py", "agent": "languages/python-engineer.md"},
-  {"stage": 3, "task": "Run tests and verify the implementation matches SPEC.md", "agent": "qa/requirement-validator.md"}
-]
+{
+  "working_dir": "test_python_skills",
+  "steps": [
+    {"stage": 0, "task": "Read skills/python-guidelines/SKILL.md and generate pyproject.toml with strict Ruff/Mypy settings. Initialize the virtual environment.", "agent": "languages/python-engineer.md"},
+    {"stage": 1, "task": "Write failing tests for the auth service as per SPEC.md", "agent": "qa/test-fixer.md"},
+    {"stage": 2, "task": "Implement the auth service in src/auth.py", "agent": "languages/python-engineer.md"},
+    {"stage": 3, "task": "Run tests and verify the implementation matches SPEC.md", "agent": "qa/requirement-validator.md"}
+  ]
+}
 ```
 
 You have access to the following tools:
@@ -40,4 +45,4 @@ To use a tool, output a JSON block wrapped in ```json ... ``` exactly like this:
 }
 ```
 Wait for the tool result to be provided to you before continuing.
-If you do not need to use a tool, output your final answer.
+If you do not need to use a tool, output your final answer (the massive JSON object).

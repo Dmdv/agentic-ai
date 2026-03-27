@@ -177,15 +177,25 @@ If the SPEC.md involves a language or framework that matches a Skill (e.g., they
             if json_match:
                 json_str = json_match.group(1).strip()
             else:
-                json_str = response[response.find('['):response.rfind(']')+1]
+                json_str = response[response.find('{'):response.rfind('}')+1]
                 
-            steps = json.loads(json_str)
+            plan_data = json.loads(json_str)
+            
+            # Backwards compatibility fallback if the model still outputs an array
+            if isinstance(plan_data, list):
+                steps = plan_data
+                working_dir = "."
+            else:
+                steps = plan_data.get("steps", [])
+                working_dir = plan_data.get("working_dir", ".")
+                
             if isinstance(steps, list) and len(steps) > 0 and isinstance(steps[0], str):
                 steps = [{"task": s, "agent": None} for s in steps]
-            return steps
+                
+            return working_dir, steps
         except Exception as e:
             print(f"Failed to parse Planner JSON output: {e}\nRaw output: {response}")
-            return [{"task": "Implement SPEC.md", "agent": None}]
+            return ".", [{"task": "Implement SPEC.md", "agent": None}]
 
     async def _execute_single_task(self, task_info: Dict[str, Any], preloaded_model, preloaded_tokenizer, step_num: int) -> str:
         task = task_info.get("task", "")
@@ -195,7 +205,8 @@ If the SPEC.md involves a language or framework that matches a Skill (e.g., they
             model_name=self.engineer_model_name, 
             keep_in_memory=True, 
             preloaded_model=preloaded_model, 
-            preloaded_tokenizer=preloaded_tokenizer
+            preloaded_tokenizer=preloaded_tokenizer,
+            working_dir=self.working_dir
         )
         
         found_persona_path = None
@@ -238,6 +249,7 @@ If the SPEC.md involves a language or framework that matches a Skill (e.g., they
 
     async def _run_execution_phase(self, steps: List[Dict[str, Any]]):
         print(f"\n=== PHASE 3: PARALLEL EXECUTION & VALIDATION ===")
+        print(f"[SYSTEM] Orchestrator scoped to directory sandbox: '{self.working_dir}'")
         
         # Group steps by stage
         stages = {}
@@ -256,6 +268,7 @@ If the SPEC.md involves a language or framework that matches a Skill (e.g., they
         report_lines = [
             f"# SDD Swarm Execution Report",
             f"**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Execution Sandbox:** `{self.working_dir}`",
             f"\n## Approved Development Plan",
         ]
         
@@ -310,7 +323,14 @@ If the SPEC.md involves a language or framework that matches a Skill (e.g., they
         await self._run_spec_phase(user_prompt)
         
         # Phase 2: Planning
-        steps = self._run_planning_phase()
+        detected_dir, steps = self._run_planning_phase()
+        
+        # We dynamically update the orchestrator's working_dir based on the LLM's parsing of the spec!
+        if detected_dir and detected_dir != ".":
+            print(f"\n[SYSTEM] Architect detected nested target directory: {detected_dir}")
+            self.working_dir = detected_dir
+            # Ensure the target directory physically exists before spawning the engineers
+            os.makedirs(self.working_dir, exist_ok=True)
         
         # Phase 3: Execution with Validation
         await self._run_execution_phase(steps)
