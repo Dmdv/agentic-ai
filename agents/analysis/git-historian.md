@@ -11,6 +11,8 @@ tools:
   - read_text_file
   - search_files
   - list_directory
+  - brave_web_search
+  - brave_local_search
 thinking:
   mode: enabled
   budget_tokens: 64000

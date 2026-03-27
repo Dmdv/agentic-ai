@@ -309,6 +309,18 @@ If you do not need to use a tool, output your final answer and explanation.
             args=["mcp_server_vision.py"],
         )
 
+        # 9. Brave Search Server (Node/npx) - For general internet search
+        brave_api_key = os.environ.get("BRAVE_API_KEY", "")
+        if brave_api_key:
+            brave_params = StdioServerParameters(
+                command="npx",
+                args=["-y", "@modelcontextprotocol/server-brave-search"],
+                env={"BRAVE_API_KEY": brave_api_key, **os.environ}
+            )
+        else:
+            print("[WARNING] BRAVE_API_KEY not found in .env. Web Search capability will be disabled.")
+            brave_params = None
+
         servers = {
             "Filesystem": fs_params,
             "Git": git_params,
@@ -320,8 +332,10 @@ If you do not need to use a tool, output your final answer and explanation.
             "Vision": vision_params
         }
 
-        self.server_configs = servers
+        if brave_params:
+            servers["BraveSearch"] = brave_params
 
+        self.server_configs = servers
     async def execute_tool_call(self, tool_name: str, tool_kwargs: dict) -> str:
         if tool_name == "create_mcp_server":
             server_name = tool_kwargs.get("server_name", "custom_server")
