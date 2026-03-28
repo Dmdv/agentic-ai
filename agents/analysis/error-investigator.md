@@ -13,8 +13,7 @@ tools:
   - mcp-server-fetch
   - run_bash_command
   - write_file
-  - brave_web_search
-  - brave_local_search
+  - web_search
 thinking:
   mode: enabled
   budget_tokens: 64000

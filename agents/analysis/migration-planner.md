@@ -14,8 +14,7 @@ tools:
   - list_directory
   - write_file
   - TodoWrite
-  - brave_web_search
-  - brave_local_search
+  - web_search
 thinking:
   mode: enabled
   budget_tokens: 64000
