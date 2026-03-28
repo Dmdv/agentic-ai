@@ -67,10 +67,21 @@ Instead of hardcoding custom Python tools, the Engineer model interacts with you
 5.  **Memory:** A Knowledge Graph server for the Swarm to share context across sessions.
 6.  **Secure Bash (`mcp_server_bash.py`):** A custom-built, highly constrained Python server that allows the agent to run linters and tests (`pytest`, `npm run test`, `cargo build`) to close the Autonomous CI/CD Loop, without the security risk of giving an AI raw terminal access.
 
+### 5. Security & Isolation
+To prevent an autonomous AI from accidentally damaging the host macOS environment, we built three layers of strict sandboxing:
+1.  **Directory Sandboxing (`--dir`):** The orchestrator deduces the target directory from your prompt and dynamically injects a hardcoded scope restriction into the prompt of all 40+ agents. The agent is psychologically blocked from scanning the root hard drive or parent directories.
+2.  **Virtual Environment Enforcement:** The Python orchestrator dynamically calculates `sys.executable` and passes it to all Python-based MCP servers (Git, SQLite, Web Search, Bash). This mathematically guarantees the servers run inside the isolated `.venv`, protecting the global macOS Python environment.
+3.  **Language-Specific Isolation:** Specialized language agents (`python-engineer.md`, `c-engineer.md`, `cpp-engineer.md`) are explicitly forbidden from compiling binaries into the root directory. They force the use of `pyproject.toml`, CMake `build/` directories, and Makefiles.
+
 ---
 
 ## 📂 Repository Contents (The Orchestrator Scripts)
 
+### Specifications
+*   `AGENTIC_INFRASTRUCTURE_SPECS_V6_MASTER.md`: The final, complete architectural blueprint.
+*   *(V1 - V5 specs are preserved for historical context).*
+
+### The Python Orchestrators
 You do not need to use all of the Python scripts in this repository. They exist as a historical record of how the architecture evolved from a basic "Proof of Concept" into a massive "Enterprise Swarm".
 
 ### The "Historical" Scripts (Proof of Concepts)
